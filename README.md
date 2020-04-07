@@ -30,5 +30,20 @@ For more information, have a look at my blogpost on this: https://blog.infosecwo
 
 Disclaimer: This worked for me on an old Atom system, a Celeron thing, and last (but not least) a PC Engines APU4C4 (https://www.pcengines.ch/apu4c4.htm) bought at https://teklager.se/en/ (great service, no affiliation). The little APU just works and uses about 6W so a great saving even compared to the Atom/Celeron boxes.
 
+2020-06-05 added GPS and configured as Stratum-1 NTP Server - Run the install-apu-stratum.sh script when/if you've connected the GPS to J18 as described below.
+
+
+| GPS     | J18     | J18 - Pin  | Comment                 |
+| ------- | ------- | ---------- | ----------------------- | 
+| VCC     | V3      |     2      |  3 Volt                 |
+| Ground  | Ground  |     1      |  Ground                 |
+| TX      | RX      |     7      |  TX (GPS) -> RX (J18)   |                                                
+| RX      | TX      |     8      |  RX (GPS) -> TX (J18)   |
+| PPS     | DCD     |     9      |  Kernel PPS uses DCD    |
+
+
+
+Inline-style: 
+![alt text](./gps.jpg) "GPS Ublox7")
 
 ### I do no assume any responsibility for any outcome of running the script, so please engage brain and verify everything yourself!! ###

@@ -5,10 +5,11 @@
 # Author:       Martin Boller                                       #
 #                                                                   #
 # Email:        martin@bollers.dk                                   #
-# Last Update:  2019-12-08                                          #
-# Version:      1.20                                                #
+# Last Update:  2020-07-06                                          #
+# Version:      1.30                                                #
 #                                                                   #
-# Changes:      IP forwarding routine (1.20)                        #
+# Changes:      Sysfsutils/performance CPU governor (1.30)          #
+#               IP forwarding routine (1.20)                        #
 #               Added get_information (1.10)                        #
 #               Initial version (1.00)                              #
 #                                                                   #
@@ -477,11 +478,25 @@ install_prerequisites() {
     echo -e "\e[32minstall_prerequisites()\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
     sudo sync \
-    && echo -e "\e[36m-prerequisites...\e[0m" && sudo apt-get install libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4;
+    && echo -e "\e[36m-prerequisites...\e[0m" && sudo apt-get install libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4 sysfsutils;
     systemctl daemon-reload;
     systemctl enable bind9.service;
     systemctl enable isc-dhcp-server.service;
     /usr/bin/logger 'install_prerequisites()' -t 'Debian based Firewall';
+}
+
+configure_cpu() {
+    echo -e "\e[32mconfigure_cpu()\e[0m";
+    echo -e "\e[36m-CPU performance governoer\e[0m";
+    sudo sh -c "cat << EOF  >> /etc/sysfs.conf
+## Configure AMD Jaguar to run all cores at 1Ghz
+devices/system/cpu/cpu0/cpufreq/scaling_governor = performance
+devices/system/cpu/cpu1/cpufreq/scaling_governor = performance
+devices/system/cpu/cpu2/cpufreq/scaling_governor = performance
+devices/system/cpu/cpu3/cpufreq/scaling_governor = performance
+EOF";
+    sync;
+    /usr/bin/logger 'configure_ipfwd()' -t 'Debian based Firewall';
 }
 
 configure_ipfwd() {
@@ -1142,6 +1157,9 @@ configure_ipfwd;
 configure_dhcp_server;
 configure_bind;
 configure_resolv;
+
+# CPU
+configure_cpu;
 
 # SSH setup
 install_ssh_keys;
