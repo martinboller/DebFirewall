@@ -42,8 +42,12 @@ Disclaimer: This worked for me on an old Atom system, a Celeron thing, and last 
 | PPS     | DCD     |     9      |  Kernel PPS uses DCD    |
 
 
+Found these little GPS receivers on e-bay, around $7, so bought quite a few (5 stratum-1 servers deployed so far)
+![alt text](./gps.jpg "GPS Ublox7")
 
-Inline-style: 
-![alt text](./gps.jpg) "GPS Ublox7")
+For the APU4C4 drilled a 6.5 mm hole in the front and mounted the GPS board internally. Had to mount it in the front, as there's no room left in the back with 4 NIC's and wireless.
+
+![alt text](./apu-front-gps.jpg "APU with GPS")
+
 
 ### I do no assume any responsibility for any outcome of running the script, so please engage brain and verify everything yourself!! ###
