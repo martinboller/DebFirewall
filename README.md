@@ -63,5 +63,4 @@ For the APU4C4 drilled a 6.5 mm hole in the front of the lid and mounted the GPS
 ![alt text](./apu-front-gps.jpg "APU with GPS")
 
 ____
-# I do no assume any responsibility for the outcome of running any of these scripts and/or modifying the hardware (APU4C4), so please engage brain and verify everything yourself!! #
-____
+## I do not assume any responsibility for the outcome of running these scripts and/or modifying the hardware (APU4C4), so please engage brain and verify everything yourself!! ##
