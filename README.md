@@ -30,16 +30,17 @@ For more information, have a look at my blogpost on this: https://blog.infosecwo
 
 Disclaimer: This worked for me on an old Atom system, a Celeron thing, and last (but not least) a PC Engines APU4C4 (https://www.pcengines.ch/apu4c4.htm) bought at https://teklager.se/en/ (great service, no affiliation). The little APU just works and uses about 6W so a great saving even compared to the Atom/Celeron boxes.
 
-2020-06-05 added GPS and configured as Stratum-1 NTP Server - Run the install-apu-stratum.sh script when/if you've connected the GPS to J18 as described below.
+2020-06-05 added GPS and configured as Stratum-1 NTP Server - Run the install-apu-stratum.sh script when/if you've connected the GPS to J18 as described below using #3 of the Nuvoton chip (schematics for for the APU4C4 board can be found here: https://www.pcengines.ch/schema/apu4c.pdf) this ends up becoming /dev/ttyS2.
+The Nuvoton was used for 2 main reasons: 1) COM1 is used for console access 2) The GPS boards are 3v.
 
 
 | GPS     | J18     | J18 - Pin  | Comment                 |
 | ------- | ------- | ---------- | ----------------------- | 
 | VCC     | V3      |     2      |  3 Volt                 |
-| Ground  | Ground  |     1      |  Ground                 |
-| TX      | RX      |     7      |  TX (GPS) -> RX (J18)   |                                                
-| RX      | TX      |     8      |  RX (GPS) -> TX (J18)   |
-| PPS     | DCD     |     9      |  Kernel PPS uses DCD    |
+| GND     | Ground  |     1      |  Ground                 |
+| TXD     | RXD3#   |     7      |  TX (GPS) -> RX (J18)   |                                                
+| RXD     | TXD3#   |     8      |  RX (GPS) -> TX (J18)   |
+| PPS     | DCD3#   |     9      |  Kernel PPS uses DCD    |
 
 
 Found these little GPS receivers on e-bay, around $7, so bought quite a few (5 stratum-1 servers deployed so far)
