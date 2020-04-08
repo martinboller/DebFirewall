@@ -40,7 +40,6 @@ The Nuvoton was used for 2 main reasons: 1) COM1 is used for console access 2) T
 
 | GPS     | J18     | J18 Pin  | Comment                 |
 | ------- | ------- | -------- | ----------------------- | 
-| VCC     | V3      | 2        |  3 Volt                 |
 | GND     | Ground  | 1        |  Ground                 |
 | VCC     | V3      | 2        |  3 Volt                 |
 | TXD     | RXD3#   | 7        |  TX (GPS) -> RX (J18)   |                                                
