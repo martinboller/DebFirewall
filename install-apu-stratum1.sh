@@ -59,7 +59,7 @@ stty -F /dev/ttyS2 9600
 sleep 10
 systemctl restart gpsd.service;
 systemctl restart gpsd.socket;
-sleep 10
+sleep 2
 # Force gps service to wakeup
 gpspipe -r -n 1 &
 

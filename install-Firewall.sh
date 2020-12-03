@@ -361,10 +361,18 @@ configure_rsyslog() {
 if $msg contains "iptables:" then
 *.* @127.0.0.1:9001
 EOF";
+
     # Writing iptables logdata to separate file
     echo -e "\e[36m-Configure syslog to filebeat\e[0m";
     sudo sh -c "cat << EOF  > /etc/rsyslog.d/30-iptables.conf
 :msg,contains,"iptables:" /var/log/iptables.log
+& stop
+EOF";
+
+    # Writing ntppeers data from iptables logdata to separate file
+    echo -e "\e[36m-Configure ntppeers.log\e[0m";
+    sudo sh -c "cat << EOF  > /etc/rsyslog.d/30-ntppeers.conf
+:msg,contains,"ntppeers:" /var/log/ntppeers.log
 & stop
 EOF";
     sync;
@@ -472,6 +480,39 @@ configure_timezone() {
     sudo sh -c "echo 'Etc/UTC' > /etc/timezone";
     sudo dpkg-reconfigure -f noninteractive tzdata;
     /usr/bin/logger 'configure_timezone()' -t 'Debian based Firewall';
+}
+
+configure_logrotate() {
+    echo -e "\e[32mconfigure_logrotate()\e[0m";
+    echo -e "\e[36m-ntppeers.log\e[0m";
+    # configuring logrotation for ntppeers.log
+    sudo sh -c "cat << EOF  > /etc/logrotate.d/ntp 
+/var/log/ntppeers.log {
+  rotate 1
+  daily
+  compress
+  create 640 root root
+  notifempty
+  postrotate
+    /usr/lib/rsyslog/rsyslog-rotate
+  endscript
+}
+EOF";
+
+    echo -e "\e[36m-iptables.log\e[0m";
+    # configuring logrotation for iptables.log
+    sudo sh -c "cat << EOF  > /etc/logrotate.d/iptables 
+/var/log/iptables.log {
+  rotate 1
+  daily
+  compress
+  create 640 root root
+  notifempty
+  postrotate
+    /usr/lib/rsyslog/rsyslog-rotate
+  endscript
+}
+EOF"
 }
 
 install_prerequisites() {
@@ -1175,6 +1216,8 @@ configure_rsyslog;
 ## Filebeat
 install_filebeat;
 configure_filebeat;
+## logrotate
+configure_logrotate;
 
 # If using alerta.io install alerta and send heartbeats to alertaserver
 install_alerta;
