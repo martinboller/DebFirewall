@@ -5,8 +5,8 @@
 # Author:       Martin Boller                                       #
 #                                                                   #
 # Email:        martin@bollers.dk                                   #
-# Last Update:  2020-07-06                                          #
-# Version:      1.30                                                #
+# Last Update:  2021-05-20                                          #
+# Version:      1.31                                                #
 #                                                                   #
 # Changes:      Sysfsutils/performance CPU governor (1.30)          #
 #               IP forwarding routine (1.20)                        #
@@ -174,6 +174,37 @@ EOF";
 
 EOF";
 
+# BIND logging
+   # "local" BIND9 configuration details
+    echo -e "\e[36m-Configure bind local\e[0m";
+    sudo sh -c "cat << EOF  > /etc/bind/named.conf.log
+logging {
+  channel bind_log {
+    file "/var/log/named/bind.log" versions 2 size 50m;
+    severity info;
+    print-category yes;
+    print-severity yes;
+    print-time yes;
+  };
+# Response Policy Zone logging
+  channel rpzlog {
+    file "/var/log/named/rpz.log" versions unlimited size 100m;
+    print-time yes;
+    print-category yes;
+    print-severity yes;
+    severity error;
+  };
+  category default { bind_log; };
+  category update { bind_log; };
+  category update-security { bind_log; };
+  category security { bind_log; };
+  category queries { bind_log; };
+  category lame-servers { bind_log; };
+  category rpz { rpzlog; };
+};
+EOF";
+    echo 'include "/etc/bind/named.conf.log";' | sudo tee -a /etc/bin/named.conf;
+sudo tee -a 
     # 20.168.192.in-addr.arpa
     sudo sh -c "cat << EOF  > /var/lib/bind/db.20.168.192.in-addr.arpa
 \$ORIGIN .
