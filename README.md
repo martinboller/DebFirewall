@@ -1,18 +1,22 @@
 # DebFirewall
-## Creates a Debian Based Firewall (Should work with Ubuntu too)
+## Creates a Debian Based Firewall (Should work with Ubuntu too, but untested)
 
 ### Based on the work done by Joff Thyer of Blackhills Information Security: https://www.blackhillsinfosec.com/how-to-create-a-soho-router-using-ubuntu-linux/
 
-Installs a complete SoHo firewall on Debian Buster or Stretch, with
+Installs a complete SoHo firewall on Debian 10 (Buster) or Debian 11 (Bullseye), with
  - BIND providing local name resolution.
- - ISC-DHCP-Server providing local DHCP
+ - ISC-DHCP-Server providing local DHCP.
  - NTP resolves some of the systemd fu..ery regarding this + ensures that there's a current leapseconds file available
+ - Configures and updates threatfox data as a Response Policy Zone weekly https://threatfox.abuse.ch/
+ - Add a gps and the firewall can be a Stratum-1 server too - add GPS hardware and run "install-apu-stratum.sh"
+ - Using Crowdsec IPS
 
-Optional* components:
+Optional components:
  - DSHIELD logging: see https://isc.sans.edu/howto.html
- - Filebeat: forwarding the logs to Logstash for centralized log ingestion into Elasticsearch
+ - Filebeat: forwarding logs to Logstash for centralized log ingestion into Elasticsearch
+ - Crowdsec<sup>1</sup>: https://crowdsec.net/ Massive Multiplayer IPS
 
- _*They install by default, modify the "main" routine accordingly._
+ _<sup>1</sup> Crowdsec install by default, modify the "main" routine accordingly._
 
 The overall setup hardcoded in the script is:
 
@@ -22,15 +26,17 @@ The overall setup hardcoded in the script is:
 | homenet1   | 192.168.10.1   | enp2s0 |
 | homenet2   | 192.168.20.1   | enp3s0 |                                                
 | homenet3   | 192.168.30.1   | enp4s0 |
-| homenet4   | 192.168.40.1   | wlan0  |
+| homenet4   | 192.168.40.1   | wlp5s0 |
 
 If you need to change this, you'll have to search and replace as required for your specific environment.
 
 For more information, have a look at my blogpost on this: https://blog.infosecworrier.dk/2019/12/debian-based-low-power-firewall.html
 
-Disclaimer: This worked for me on an old Atom system, then a Celeron system, and last (but not least) a PC Engines APU4C4 (https://www.pcengines.ch/apu4c4.htm) bought at https://teklager.se/en/ (great service, no affiliation). The APU4C4 just works and uses about 6-10W so a great saving even compared to the Atom/Celeron boxes. It has had no issues keeping up with an entire family as well as my lab/test systems connected to a 300 Mb/s symmetric link.
+Disclaimer: This worked for me on an old Atom system, then a Celeron system, and last (but not least) a PC Engines APU4C4 (https://www.pcengines.ch/apu4c4.htm) bought at https://teklager.se/en/ (great service, no affiliation). The APU4C4 just works and uses about 6-10W so a great saving even compared to the Atom/Celeron boxes. It has had no issues keeping up with an entire family as well as my lab/test systems connected to a 1 Gb/s symmetric link.
 
 ______
+## 2021-12-10 Crowdsec and major overhaul of everything (42)
+Added Crowdsec and improved several other elements, including exim configuration
 
 ## 2020-06-05 added GPS and configured as Stratum-1 NTP Server ##
 
@@ -49,7 +55,7 @@ The Nuvoton was used for 2 main reasons: 1) COM1 is used for console access 2) T
 
 ### CPU Throttling ###
 
-The impact on PPS timing from the CPU changing clock frequency dynamically is very noticeable on the accuracy NTPD. Thus the system is configured with the performance governor set to performance using sysfsutils. This was added to the main script, as that doesn't hurt netfilter's performance either.
+The impact on PPS timing from the CPU changing clock frequency dynamically is very noticeable on the accuracy of NTPD. Thus the system is configured with the performance governor set to performance using sysfsutils. This was added to the main script, as that doesn't hurt netfilter's performance either.
 
 ## Hardware ##
 

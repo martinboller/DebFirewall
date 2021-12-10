@@ -5,63 +5,63 @@
 # Author:       Martin Boller                                       #
 #                                                                   #
 # Email:        martin@bollers.dk                                   #
-# Last Update:  2021-05-20                                          #
-# Version:      1.31                                                #
+# Last Update:  2021-12-10                                          #
+# Version:      1.50                                                #
 #                                                                   #
-# Changes:      Sysfsutils/performance CPU governor (1.30)          #
+# Changes:      Crowdsec implementation                             #
+#               Sysfsutils/performance CPU governor (1.30)          #
 #               IP forwarding routine (1.20)                        #
 #               Added get_information (1.10)                        #
 #               Initial version (1.00)                              #
 #                                                                   #
 #####################################################################
 
+get_information() {
+    /usr/bin/logger 'get_information()' -t 'Debian-FW-20211210';
+    echo -e "\e[32mget_information()\e[0m";
+    read -s "FQDN of mailserver: "  SMTP_SERVER;
+    read -s "Port for mailserver: "  SMTP_SERVER_PORT;
+    read -s "Outgoing Sender Email Address: "  MAIL_ADDRESS;
+    read -s "Domain for mailserver: "  MAIL_DOMAIN;
+    read -s "Internal Domain: "  INTERNAL_DOMAIN;
+    read -s "Firewall host name: "  FIREWALL_NAME;
+#    read -s "DSHIELD userid: "  DSHIELD_USERID;
+#    read -s "ALERTA server hostname: "  ALERTA_SERVER;
+#    read -s "ALERTA API Key: "  ALERTA_APIKEY;
+    read -s "ED25519 SSH Public key: "  SSH_KEY;
+    hostnamectl set-hostname $FIREWALL_NAME.$INTERNAL_DOMAIN;
+    /usr/bin/logger 'get_information() finished' -t 'Debian-FW-20211210';
+}
+
 configure_locale() {
+    /usr/bin/logger 'configure_locale()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_locale()\e[0m";
     echo -e "\e[36m-Configure locale (default:C.UTF-8)\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
     update-locale LANG=en_GB.utf8;
-    sudo sh -c "cat << EOF  > /etc/default/locale
+    cat << __EOF__  > /etc/default/locale
 # /etc/default/locale
 LANG=C.UTF-8
 LANGUAGE=C.UTF-8
 LC_ALL=C.UTF-8
-EOF";
-    /usr/bin/logger 'configure_locale()' -t 'Debian based Firewall';
-}
-
-get_information() {
-    echo -e "\e[32mget_information()\e[0m";
-    read -s "FQDN of mailserver: "  SMTP_SERVER;
-    read -s "Port for mailserver: "  SMTP_SERVER_PORT;
-    read -s "Port for mailserver: "  MAIL_ADDRESS;
-    read -s "Domain for mailserver: "  MAIL_DOMAIN;
-    read -s "Internal Domain: "  INTERNAL_DOMAIN;
-    read -s "Firewall host name: "  FIREWALL_NAME;
-    read -s "DSHIELD userid: "  DSHIELD_USERID;
-    read -s "ALERTA server hostname: "  ALERTA_SERVER;
-    read -s "ALERTA API Key: "  ALERTA_APIKEY;
-    read -s "ED25519 SSH Public key: "  SSH_KEY;
-    /usr/bin/logger 'get_information()' -t 'Debian based Firewall';
+__EOF__
+    /usr/bin/logger 'configure_locale() finished' -t 'Debian-FW-20211210';
 }
 
 configure_bind() {
+    /usr/bin/logger 'configure_bind()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_bind()\e[0m";
     systemctl stop bind9.service;
-
     echo -e "\e[36m-Configure bind options\e[0m";
-    sudo sh -c "cat << EOF  > /etc/bind/named.conf.options
-    options {
+    cat << __EOF__  > /etc/bind/named.conf.options
+options {
 	directory "/var/cache/bind";
-
-	//========================================================================
-	// If BIND logs error messages about the root key being expired,
-	// you will need to update your keys.  See https://www.isc.org/bind-keys
-	//========================================================================
 	dnssec-validation auto;
-	
+
 	check-names master ignore;
 	auth-nxdomain no;    # conform to RFC1035
 	listen-on-v6 { none; };
+	filter-aaaa-on-v4 yes;
 	listen-on { 127.0.0.1; 192.168.10.1; 192.168.20.1; 192.168.30.1; 192.168.40.1; };
 	allow-query { homenet; };
 	recursion yes;
@@ -69,12 +69,18 @@ configure_bind() {
 	allow-query-cache { homenet; };
     ixfr-from-differences yes;
     empty-zones-enable yes;
+    response-policy {
+		#zone "rpz.block.misp";
+		zone "threatfox.rpz";
+    };
 };
-EOF";
+__EOF__
 
+    # Generate rndc key
+    rndc-confgen -a -c /etc/bind/rndc.key;    
     # "local" BIND9 configuration details
     echo -e "\e[36m-Configure bind local\e[0m";
-    sudo sh -c "cat << EOF  > /etc/bind/named.conf.local
+    cat << __EOF__  > /etc/bind/named.conf.local
 //
 // Do any local configuration here
 //
@@ -97,7 +103,7 @@ zone "$INTERNAL_DOMAIN" {
         file "/var/lib/bind/db.$INTERNAL_DOMAIN";
 	check-names ignore;
         //allow-update { key rndc-key; };
-        allow-update { 192.168.0.0/8; };
+        allow-update { 192.168.0.0/16; };
         allow-transfer { 192.168.10.1; localhost; };
         };
 
@@ -105,7 +111,7 @@ zone "10.168.192.in-addr.arpa" {
         type master;
        	check-names ignore;
 //	allow-update { key rndc-key; };	
-        allow-update { 192.168.0.0/8; };
+        allow-update { 192.168.10.0/8; };
         allow-transfer { 192.168.10.1; localhost; };
         file "/var/lib/bind/db.10.168.192.in-addr.arpa";
 	};
@@ -114,7 +120,7 @@ zone "20.168.192.in-addr.arpa" {
         type master;
         check-names ignore;
 //        allow-update { key rndc-key; };
-        allow-update { 192.168.0.0/8; };
+        allow-update { 192.168.20.0/8; };
         allow-transfer { 192.168.10.1; localhost; };
         file "/var/lib/bind/db.20.168.192.in-addr.arpa";
 	};
@@ -123,7 +129,7 @@ zone "30.168.192.in-addr.arpa" {
         type master;
         check-names ignore;
 //        allow-update { key rndc-key; };
-        allow-update { 192.168.0.0/8; };
+        allow-update { 192.168.30.0/8; };
         allow-transfer { 192.168.10.1; localhost; };
         file "/var/lib/bind/db.30.168.192.in-addr.arpa";
         };
@@ -132,14 +138,14 @@ zone "40.168.192.in-addr.arpa" {
         type master;
         check-names ignore;
 //        allow-update { key rndc-key; };
-        allow-update { 192.168.0.0/8; };
+        allow-update { 192.168.40.0/8; };
         allow-transfer { 192.168.10.1; localhost; };
         file "/var/lib/bind/db.40.168.192.in-addr.arpa";
         };
-EOF";
+__EOF__
 
     echo -e "\e[36m-Configure forward lookup zone\e[0m";
-    sudo sh -c "cat << EOF  > /var/lib/bind/db.$INTERNAL_DOMAIN
+    cat << __EOF__  > /var/lib/bind/db.$INTERNAL_DOMAIN
 \$ORIGIN .
 \$TTL 604800	; 1 week
 $INTERNAL_DOMAIN	IN SOA	localhost. root.localhost. (
@@ -156,11 +162,11 @@ $FIREWALL_NAME	A	192.168.10.1
 			    A	192.168.20.1
 			    A	192.168.30.1
 			    A	192.168.40.1
-EOF";
+__EOF__
 
     echo -e "\e[36m-Configure reverse lookup zones\e[0m";
     # 10.168.192.in-addr.arpa
-    sudo sh -c "cat << EOF  > /var/lib/bind/db.10.168.192.in-addr.arpa
+    cat << __EOF__  > /var/lib/bind/db.10.168.192.in-addr.arpa
 \$ORIGIN .
 \$TTL 604800	; 1 week
 10.168.192.in-addr.arpa	IN SOA	localhost. localhost.root. (
@@ -171,13 +177,12 @@ EOF";
 				604800     ; minimum (1 week)
 				)
 			NS	$FIREWALL_NAME.
-
-EOF";
+__EOF__
 
 # BIND logging
    # "local" BIND9 configuration details
     echo -e "\e[36m-Configure bind local\e[0m";
-    sudo sh -c "cat << EOF  > /etc/bind/named.conf.log
+    cat << __EOF__  > /etc/bind/named.conf.log
 logging {
   channel bind_log {
     file "/var/log/named/bind.log" versions 2 size 50m;
@@ -202,11 +207,11 @@ logging {
   category lame-servers { bind_log; };
   category rpz { rpzlog; };
 };
-EOF";
-    echo 'include "/etc/bind/named.conf.log";' | sudo tee -a /etc/bin/named.conf;
-sudo tee -a 
+__EOF__
+    echo 'include "/etc/bind/named.conf.log";' | tee -a /etc/bin/named.conf;
+tee -a 
     # 20.168.192.in-addr.arpa
-    sudo sh -c "cat << EOF  > /var/lib/bind/db.20.168.192.in-addr.arpa
+    cat << __EOF__  > /var/lib/bind/db.20.168.192.in-addr.arpa
 \$ORIGIN .
 \$TTL 604800	; 1 week
 20.168.192.in-addr.arpa	IN SOA	localhost. localhost.root. (
@@ -217,11 +222,10 @@ sudo tee -a
 				604800     ; minimum (1 week)
 				)
 			NS	$FIREWALL_NAME.
-
-EOF";
+__EOF__
 
     # 30.168.192.in-addr.arpa
-    sudo sh -c "cat << EOF  > /var/lib/bind/db.30.168.192.in-addr.arpa
+    cat << __EOF__  > /var/lib/bind/db.30.168.192.in-addr.arpa
 \$ORIGIN .
 \$TTL 604800	; 1 week
 30.168.192.in-addr.arpa	IN SOA	localhost. localhost.root. (
@@ -232,11 +236,10 @@ EOF";
 				604800     ; minimum (1 week)
 				)
 			NS	$FIREWALL_NAME.
-
-EOF";
+__EOF__
 
     # 40.168.192.in-addr.arpa
-    sudo sh -c "cat << EOF  > /var/lib/bind/db.40.168.192.in-addr.arpa
+    cat << __EOF__  > /var/lib/bind/db.40.168.192.in-addr.arpa
 \$ORIGIN .
 \$TTL 604800	; 1 week
 40.168.192.in-addr.arpa	IN SOA	localhost. localhost.root. (
@@ -247,19 +250,63 @@ EOF";
 				604800     ; minimum (1 week)
 				)
 			NS	$FIREWALL_NAME.
-
-EOF";
+__EOF__
     sync;
     systemctl restart bind9.service;
-    /usr/bin/logger 'configure_bind()' -t 'Debian based Firewall';
+    /usr/bin/logger 'configure_bind() finished' -t 'Debian-FW-20211210';
+}
+
+configure_threatfox() {
+    /usr/bin/logger 'configure_threatfox()' -t 'Debian-FW-20211210';
+    cat << __EOF__  > /lib/systemd/system/update-threatfox.timer
+[Unit]
+Description=Weekly job to update the threatfox RPZ db
+Documentation=https://threatfox.abuse.ch/export/#rpz
+
+[Timer]
+# Don't run for the first 15 minutes after boot
+OnBootSec=15min
+# Run Weekly
+OnCalendar=Weekly
+# Specify service
+Unit=update-threatfox.service
+
+[Install]
+WantedBy=multi-user.target
+__EOF__
+
+    cat << __EOF__  > /lib/systemd/system/update-threatfox.timer
+[Unit]
+Description=service file downloading latest rpz from threatfox
+Documentation=https://threatfox.abuse.ch/export/#rpz
+
+[Service]
+User=bind
+Group=bind
+ExecStartPre=-/usr/sbin/rndc zonestatus threatfox.rpz
+ExecStart=-/usr/bin/wget -O /var/lib/bind/threatfox.rpz https://threatfox.abuse.ch/downloads/threatfox.rpz
+ExecStopPost=-/usr/sbin/rndc reload
+WorkingDirectory=/var/lib/bind/
+
+[Install]
+WantedBy=multi-user.target
+__EOF__
+    systemctl daemon-reload;
+    systemctl enable update-threatfox.timer;
+    systemctl enable update-threatfox.service;
+    systemctl daemon-reload;
+    systemctl start update-threatfox.timer;
+    systemctl start update-threatfox.service;
+    /usr/bin/logger 'configure_threatfox() finished' -t 'Debian-FW-20211210';
 }
 
 configure_dhcp_server() {
+    /usr/bin/logger 'configure_dhcp_server()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_dhcp_server()\e[0m";
     # Bind generates key at install, use that or generate new in same location
     systemctl stop isc-dhcp.server.service;
     echo -e "\e[36m-Configure dhcpd.conf\e[0m";
-    sudo sh -c "cat << EOF  > /etc/dhcp/dhcpd.conf
+    cat << __EOF__  > /etc/dhcp/dhcpd.conf
 # DHCP configuration file
 
 authoritative;
@@ -313,7 +360,7 @@ subnet 192.168.20.0 netmask 255.255.255.0 {
   option routers 192.168.20.1;
   option domain-name-servers 192.168.20.1;
   option domain-name "$INTERNAL_DOMAIN";
-  range 192.168.20.50 192.168.20.254;
+  range 192.168.20.10 192.168.20.254;
   ddns-domainname "$INTERNAL_DOMAIN.";
   ddns-rev-domainname "in-addr.arpa.";
 }
@@ -323,7 +370,7 @@ subnet 192.168.30.0 netmask 255.255.255.0 {
   option routers 192.168.30.1;
   option domain-name-servers 192.168.30.1;
   option domain-name "$INTERNAL_DOMAIN";
-  range 192.168.30.1 192.168.30.254;
+  range 192.168.30.10 192.168.30.254;
   ddns-domainname "$INTERNAL_DOMAIN.";
   ddns-rev-domainname "in-addr.arpa.";
 }
@@ -343,14 +390,14 @@ subnet 192.168.40.0 netmask 255.255.255.0 {
 #       hardware ethernet 08:00:27:d2:a4:ad;
 #       fixed-address 192.168.10.25;
 #}
-
-EOF";
+__EOF__
     sync;
     systemctl restart isc-dhcp.server.service;
-    /usr/bin/logger 'configure_dhcp_server()' -t 'Debian based Firewall';
+    /usr/bin/logger 'configure_dhcp_server()' -t 'Debian-FW-20211210';
 }
 
 install_dshield() {
+    /usr/bin/logger 'install_dshield()' -t 'Debian-FW-20211210';
     echo -e "\e[32minstall_dshield()\e[0m";
     mkdir /usr/local/dshield;
     cd /usr/local/dshield;
@@ -359,10 +406,11 @@ install_dshield() {
     mv iptables ./;
     rm iptables.tar.gz;
     cd ~;
-    /usr/bin/logger 'install_dshield()' -t 'Debian based Firewall';
+    /usr/bin/logger 'install_dshield() finished' -t 'Debian-FW-20211210';
 }
 
 configure_dshield() {
+    /usr/bin/logger 'configure_dshield()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_dshield()\e[0m";
     # copy default dshield files
     /usr/bin/cp /usr/local/dshield/dshield* /etc/;
@@ -372,68 +420,70 @@ configure_dshield() {
     /usr/bin/sed -ie s/userid=0/userid=$DSHIELD_USERID/g /etc/dshield.cnf;
     #!/bin/sh
 
-    sudo sh -c "cat << EOF  > /etc/cron.hourly/dshield
+    cat << __EOF__  > /etc/cron.hourly/dshield
 #!/bin/sh
 /usr/local/dshield/iptables.pl
 /usr/bin/logger 'Processed iptables and sent to dshield' -t 'dshield';
 exit 0
-EOF";
+__EOF__
     sync;
     chmod +x /etc/cron.hourly/dshield;
+    /usr/bin/logger 'configure_dshield() finished' -t 'Debian-FW-20211210';
+}
 
-    /usr/bin/logger 'configure_dshield()' -t 'Debian based Firewall';
+install_crowdsec() {
+    /usr/bin/logger 'install_crowdsec()' -t 'Debian-FW-20211210';
+    # Add repo
+    curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash;
+    #install crowdsec core daemon
+    apt-get -y install crowdsec;
+    # install firewall bouncer
+    apt-get -y install crowdsec-firewall-bouncer-iptables;
+    /usr/bin/logger 'install_crowdsec() finished' -t 'Debian-FW-20211210';
+}
+
+configure_crowdsec() {
+    /usr/bin/logger 'configure_crowdsec()' -t 'Debian-FW-20211210';
+    # Collection iptables
+    cscli parsers install crowdsecurity/iptables-logs;
+    cscli parsers install crowdsecurity/geoip-enrich;
+    cscli scenarios install crowdsecurity/iptables-scan-multi_ports;
+    cscli scenarios install crowdsecurity/ssh-bf;
+    cscli collections install crowdsecurity/iptables;
+    cscli postoverflows install crowdsecurity/rdns;
+    # configure crowdsec to read iptables.log, specific to this firewall build, or it won't pick up log data
+    # add - /var/log/iptables.log after the first filenames:
+    sed -ie '/filenames:/a \  - /var/log/iptables.log' /etc/crowdsec/acquis.yaml;
+    # Running 'sudo systemctl reload crowdsec' for the new configuration to be effective.
+    systemctl reload crowdsec.service;
+    /usr/bin/logger 'configure_crowdsec() finished' -t 'Debian-FW-20211210';
 }
 
 configure_rsyslog() {
-    echo -e "\e[32mconfigure_rsyslog()\e[0m";
-    # Forward all logs to Filebeat listening locally on 9001
-    echo -e "\e[36m-Configure syslog to filebeat\e[0m";
-    sudo sh -c "cat << EOF  > /etc/rsyslog.d/02-filebeat.conf
-if $msg contains "iptables:" then
-*.* @127.0.0.1:9001
-EOF";
-
+    /usr/bin/logger 'configure_rsyslog()' -t 'Debian-FW-20211210';
     # Writing iptables logdata to separate file
     echo -e "\e[36m-Configure syslog to filebeat\e[0m";
-    sudo sh -c "cat << EOF  > /etc/rsyslog.d/30-iptables.conf
+    cat << __EOF__  > /etc/rsyslog.d/30-iptables.conf
 :msg,contains,"iptables:" /var/log/iptables.log
 & stop
-EOF";
-
+__EOF__
     # Writing ntppeers data from iptables logdata to separate file
     echo -e "\e[36m-Configure ntppeers.log\e[0m";
-    sudo sh -c "cat << EOF  > /etc/rsyslog.d/30-ntppeers.conf
+    cat << __EOF__  > /etc/rsyslog.d/30-ntppeers.conf
 :msg,contains,"ntppeers:" /var/log/ntppeers.log
 & stop
-EOF";
+__EOF__
     sync;
     systemctl restart rsyslog.service;
-    /usr/bin/logger 'configure_rsyslog()' -t 'Debian based Firewall';
+    /usr/bin/logger 'configure_rsyslog() finished' -t 'Debian-FW-20211210';
 }
 
 configure_exim() {
+    /usr/bin/logger 'configure_exim()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_exim()\e[0m";
-    
     echo -e "\e[36m-Configure exim4.conf.conf\e[0m";
-    sudo sh -c "cat << EOF  > /etc/exim4/update-exim4.conf.conf
-# /etc/exim4/update-exim4.conf.conf
-#
-# Edit this file and /etc/mailname by hand and execute update-exim4.conf
-# yourself or use 'dpkg-reconfigure exim4-config'
-#
-# Please note that this is _not_ a dpkg-conffile and that automatic changes
-# to this file might happen. The code handling this will honor your local
-# changes, so this is usually fine, but will break local schemes that mess
-# around with multiple versions of the file.
-#
-# update-exim4.conf uses this file to determine variable values to generate
-# exim configuration macros for the configuration file.
-#
-# Most settings found in here do have corresponding questions in the
-# Debconf configuration, but not all of them.
-#
-# This is a Debian specific file
-
+    cat << __EOF__  > /etc/exim4/update-exim4.conf.conf
+# This is a Debian Firewall specific file
 dc_eximconfig_configtype='smarthost'
 dc_other_hostnames=''
 dc_local_interfaces='127.0.0.1'
@@ -441,83 +491,82 @@ dc_readhost='$MAIL_DOMAIN'
 dc_relay_domains=''
 dc_minimaldns='false'
 dc_relay_nets='192.168.10.0/24, 192.168.20.0/24, 192.168.30.0/24, 192.168.40.0/24'
-dc_smarthost='$MAIL_SERVER::$MAIL_SERVER_PORT'
+dc_smarthost='$MAIL_SERVER::$MAIL_ADDRESS'
 CFILEMODE='644'
 dc_use_split_config='true'
 dc_hide_mailname='true'
 dc_mailname_in_oh='true'
 dc_localdelivery='mail_spool'
-EOF";
+__EOF__
 
     echo -e "\e[36m-Configure mail access\e[0m";
-    sudo sh -c "cat << EOF  > /etc/exim4/passwd.client
+    cat << __EOF__  > /etc/exim4/passwd.client
     # password file used when the local exim is authenticating to a remote
 # host as a client.
 #
 # see exim4_passwd_client(5) for more documentation
-#
-# Example:
-### target.mail.server.example:login:password
 $SMTP_SERVER:$MAIL_ADDRESS:$MAIL_PASSWORD
-EOF";
+__EOF__
 
     echo -e "\e[36m-Configure mail addresses\e[0m";
-    sudo sh -c "cat << EOF  > /etc/email-addresses
-# This is /etc/email-addresses. It is part of the exim package
-#
-# This file contains email addresses to use for outgoing mail. Any local
-# part not in here will be qualified by the system domain as normal.
-#
-# It should contain lines of the form:
-#
-#user: someone@isp.com
-#otheruser: someoneelse@anotherisp.com
+    cat << __EOF__  > /etc/email-addresses
 <my local user>: $MAIL_ADDRESS
 root: $MAIL_ADDRESS
-EOF";
-
-    # Time to reconfigure exim4 - Just accept the defaults
-    dpgk-reconfigure exim4-config;
-    /usr/bin/logger 'configure_exim()' -t 'Debian based Firewall';
+__EOF__
+    # Time to reconfigure exim4
+    dpkg-reconfigure -fnoninteractive exim4-config;
+    /usr/bin/logger 'configure_exim() finished' -t 'Debian-FW-20211210';
 }
 
 install_filebeat() {
+    /usr/bin/logger 'install_filebeat()' -t 'Debian-FW-20211210';
     export DEBIAN_FRONTEND=noninteractive;
     # Install key and apt source for elastic
-    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
     #apt-key adv --fetch-keys https://artifacts.elastic.co/GPG-KEY-elasticsearch;
-    echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-7.x.list;
+    echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list;
     apt-get update;
     apt-get -y install filebeat;
     systemctl daemon-reload;
     systemctl enable filebeat.service;
-    /usr/bin/logger 'install_filebeat()' -t 'Debian based Firewall';
+    /usr/bin/logger 'install_filebeat() finished' -t 'Debian-FW-20211210';
 }
 
 configure_filebeat() {
+    /usr/bin/logger 'configure_filebeat()' -t 'Debian-FW-20211210';
+    echo -e "\e[32mconfigure rsyslog forwarding to filebeat\e[0m";
+    # Forward all logs to Filebeat listening locally on 9001
+    echo -e "\e[36m-Configure syslog to filebeat\e[0m";
+    cat << __EOF__  > /etc/rsyslog.d/02-filebeat.conf
+if \$msg contains "iptables:" then
+*.* @127.0.0.1:9001
+__EOF__
+    systemctl restart rsyslog.service;
     echo -e "\e[32mconfigure_filebeat()\e[0m";
     echo -e "\e[36m-configure Logstash server for Filebeat\e[0m";
     # Depends on your individual setup, follow Elastic guidance and change as required in iptables.rules
     systemctl start filebeat.service;
-    /usr/bin/logger 'configure_filebeat()' -t 'Debian based Firewall';
+    /usr/bin/logger 'configure_filebeat() finished' -t 'Debian-FW-20211210';
 }
 
 configure_timezone() {
+    /usr/bin/logger 'configure_timezone()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_timezone()\e[0m";
     echo -e "\e[36m-Set timezone to Etc/UTC\e[0m";
     # Setting timezone to UTC
     export DEBIAN_FRONTEND=noninteractive;
-    sudo rm /etc/localtime
-    sudo sh -c "echo 'Etc/UTC' > /etc/timezone";
-    sudo dpkg-reconfigure -f noninteractive tzdata;
-    /usr/bin/logger 'configure_timezone()' -t 'Debian based Firewall';
+    rm /etc/localtime
+    sh -c "echo 'Etc/UTC' > /etc/timezone";
+    dpkg-reconfigure -f noninteractive tzdata;
+    /usr/bin/logger 'configure_timezone() finished' -t 'Debian-FW-20211210';
 }
 
 configure_logrotate() {
+    /usr/bin/logger 'configure_logrotate()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_logrotate()\e[0m";
     echo -e "\e[36m-ntppeers.log\e[0m";
     # configuring logrotation for ntppeers.log
-    sudo sh -c "cat << EOF  > /etc/logrotate.d/ntp 
+    cat << __EOF__  > /etc/logrotate.d/ntp 
 /var/log/ntppeers.log {
   rotate 1
   daily
@@ -528,11 +577,11 @@ configure_logrotate() {
     /usr/lib/rsyslog/rsyslog-rotate
   endscript
 }
-EOF";
+__EOF__
 
     echo -e "\e[36m-iptables.log\e[0m";
     # configuring logrotation for iptables.log
-    sudo sh -c "cat << EOF  > /etc/logrotate.d/iptables 
+    cat << __EOF__  > /etc/logrotate.d/iptables 
 /var/log/iptables.log {
   rotate 1
   daily
@@ -543,154 +592,196 @@ EOF";
     /usr/lib/rsyslog/rsyslog-rotate
   endscript
 }
-EOF"
+__EOF__
+
+    echo -e "\e[36m-bind.log\e[0m";
+    # configuring logrotation for bind.log
+    cat << __EOF__  > /etc/logrotate.d/named 
+/var/log/named/bind.log {
+  rotate 2
+  daily
+  compress
+  create 640 bind bind
+  notifempty
+  postrotate
+    /usr/lib/rsyslog/rsyslog-rotate
+  endscript
+}
+
+/var/log/named/rpz.log {
+  rotate 2
+  daily
+  compress
+  create 640 bind bind
+  notifempty
+  postrotate
+    /usr/lib/rsyslog/rsyslog-rotate
+  endscript
+}
+__EOF__
+    /usr/bin/logger 'configure_logrotate() finished' -t 'Debian-FW-20211210';
 }
 
 install_prerequisites() {
-    echo -e "\e[32minstall_prerequisites()\e[0m";
+    /usr/bin/logger 'install_prerequisites' -t 'Debian-FW-20211210';
+    echo -e "\e[1;32m--------------------------------------------\e[0m";
+    echo -e "\e[1;32mInstalling Prerequisite packages\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
-    sudo sync \
-    && echo -e "\e[36m-prerequisites...\e[0m" && sudo apt-get install libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4 sysfsutils;
+    # OS Version
+    # freedesktop.org and systemd
+    . /etc/os-release
+    OS=$NAME
+    VER=$VERSION_ID
+    /usr/bin/logger "Operating System: $OS Version: $VER" -t 'Debian-FW-20211210';
+    echo -e "\e[1;32mOperating System: $OS Version: $VER\e[0m";
+    # Install prerequisites
+    echo -e "\e[36m-prerequisites...\e[0m";
+    apt-get install libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4 sysfsutils iptables vnstat iftop;
+    # Install some basic tools on a Debian net install
+    /usr/bin/logger '..Install some basic tools on a Debian net install' -t 'Debian-FW-20211210';
+    apt-get -y install adduser wget whois unzip apt-transport-https ca-certificates curl gnupg2 software-properties-common dnsutils;
+    apt-get -y install bash-completion debian-goodies dirmngr ethtool firmware-iwlwifi firmware-linux-free firmware-linux-nonfree;
+    apt-get -y install sudo firmware-linux-free flashrom geoip-database unattended-upgrades python3 python3-pip;
+    python3 -m pip install --upgrade pip;
+    # Set correct locale
     systemctl daemon-reload;
     systemctl enable bind9.service;
     systemctl enable isc-dhcp-server.service;
-    /usr/bin/logger 'install_prerequisites()' -t 'Debian based Firewall';
+    /usr/bin/logger 'install_prerequisites() finished' -t 'Debian-FW-20211210';
 }
 
 configure_cpu() {
+    /usr/bin/logger 'configure_cpu()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_cpu()\e[0m";
-    echo -e "\e[36m-CPU performance governoer\e[0m";
-    sudo sh -c "cat << EOF  >> /etc/sysfs.conf
-## Configure AMD Jaguar to run all cores at 1Ghz
+    echo -e "\e[36m-CPU performance governor\e[0m";
+    cat << __EOF__  >> /etc/sysfs.conf
+## Configure AMD Jaguar to run all cores at 1Ghz - boost at 1.4Ghz
 devices/system/cpu/cpu0/cpufreq/scaling_governor = performance
 devices/system/cpu/cpu1/cpufreq/scaling_governor = performance
 devices/system/cpu/cpu2/cpufreq/scaling_governor = performance
 devices/system/cpu/cpu3/cpufreq/scaling_governor = performance
-EOF";
+__EOF__
     sync;
-    /usr/bin/logger 'configure_ipfwd()' -t 'Debian based Firewall';
+    /usr/bin/logger 'configure_cpu() finished' -t 'Debian-FW-20211210';
 }
 
 configure_ipfwd() {
+    /usr/bin/logger 'configure_ipfwd()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_ipfwd()\e[0m";
     echo -e "\e[36m-Enabling IPv4 Forwarding\e[0m";
     /usr/bin/sed -ie s/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g /etc/sysctl.conf
     # The current ruleset is IPv4 only, so do NOT enable Ipv6 forwarding just yet
     #/usr/bin/sed -ie s/#net.ipv6.conf.all.forwarding=1/net.ipv6.conf.all.forwarding=1/g /etc/sysctl.conf
     sync;
-    /usr/bin/logger 'configure_ipfwd()' -t 'Debian based Firewall';
+    /usr/bin/logger 'configure_ipfwd() finished' -t 'Debian-FW-20211210';
 }
 
 configure_resolv() {
+    /usr/bin/logger 'configure_resolv()' -t 'Debian-FW-20211210';    
     echo -e "\e[32mconfigure_resolv()\e[0m";
     echo -e "\e[36m-Configuring resolv.conf\e[0m";
+    mv /etc/resolv.conf /etc/resolv.conf.isp;
     # DHCP changes your resolv.conf to use the ISPs dns and search order, so let's make sure we always use local BIND9
-    sudo sh -c "cat << EOF  > /etc/resolv.conf
+    cat << __EOF__  > /etc/resolv.conf
 domain $INTERNAL_DOMAIN
 search $INTERNAL_DOMAIN
 # BIND9 configured to listen on localhost
 nameserver 127.0.0.1
-EOF";
+__EOF__
     sync;
-    # Make it immutable or these changes will be overwritten
-    /usr/bin/chattr +i /etc/resolv.conf
-    /usr/bin/logger 'configure_resolv()' -t 'Debian based Firewall';    
+    # Make it immutable or these changes will be overwritten everytime dhcp lease renews
+    /usr/bin/chattr +i /etc/resolv.conf;
+    /usr/bin/logger 'configure_resolv() finished' -t 'Debian-FW-20211210';    
 }
 
 install_updates() {
+    /usr/bin/logger 'install_updates()' -t 'Debian-FW-20211210';
     echo -e "\e[32minstall_updates()\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
-    sudo sync \
-    && echo -e "\e[36m-update...\e[0m" && sudo apt-get update \
-    && echo -e "\e[36m-upgrade...\e[0m" && sudo apt-get -y upgrade \
-    && echo -e "\e[36m-dist-upgrade...\e[0m" && sudo apt-get -y dist-upgrade \
-    && echo -e "\e[36m-autoremove...\e[0m" && sudo apt-get -y --purge autoremove \
-    && echo -e "\e[36m-autoclean...\e[0m" && sudo apt-get autoclean \
+    sync \
+    && echo -e "\e[36m-update...\e[0m" && apt-get update \
+    && echo -e "\e[36m-upgrade...\e[0m" && apt-get -y upgrade \
+    && echo -e "\e[36m-full-upgrade...\e[0m" && apt-get -y full-upgrade \
+    && echo -e "\e[36m-fix.missing...\e[0m" && apt-get -y install --fix-missing \
+    && echo -e "\e[36m-autoremove...\e[0m" && apt-get -y --purge autoremove \
+    && echo -e "\e[36m-autoclean...\e[0m" && apt-get autoclean \
+    && echo -e "\e[36m-clean...\e[0m" && apt-get clean \
     && echo -e "\e[36m-Done.\e[0m" \
-    && sudo sync;
-    /usr/bin/logger 'install_updates()' -t 'Debian based Firewall';
+    && sync;
+    /usr/bin/logger 'install_updates() finished' -t 'Debian-FW-20211210';
 }
 
 install_ntp_tools() {
+    /usr/bin/logger 'install_ntp_tools()' -t 'Debian-FW-20211210';
     echo -e "\e[32minstall_ntp_tools()\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
-    sudo apt-get -y install ntpstat ntpdate;
-    /usr/bin/logger 'install_ntp_tools()' -t 'Debian based Firewall';
+    apt-get -y install ntpstat ntpdate;
+    /usr/bin/logger 'install_ntp_tools() finished' -t 'Debian-FW-20211210';
 }
 
 install_ntp() {
+    /usr/bin/logger 'install_ntp()' -t 'Debian-FW-20211210';
     echo -e "\e[32minstall_ntp()\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
-    sudo apt-get -y install ntp;
-    /usr/bin/logger 'install_ntp()' -t 'Debian based Firewall';
+    apt-get -y install ntp;
+    /usr/bin/logger 'install_ntp() finished' -t 'Debian-FW-20211210';
 }
 
 configure_ntp() {
+    /usr/bin/logger 'configure_ntp()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_ntp()\e[0m";
     echo -e "\e[36m-Stop ntpd\e[0m";
-    sudo systemctl stop ntp.service;
-
+    systemctl stop ntp.service;
     echo -e "\e[36m-Create new ntp.conf\e[0m";
-
-    sudo sh -c "cat << EOF  > /etc/ntp.conf
-##################################################
-#
-# NTP Setup for Debian based Firewall
-# Add local NTP servers if you have any.
-#      /etc/ntp.conf
-#
-##################################################
+    cat << __EOF__  > /etc/ntp.conf
+# /etc/ntp.conf, configuration for ntpd; see ntp.conf(5) for help
 
 driftfile /var/lib/ntp/ntp.drift
 
-# Statistics will be logged. Comment out next line to disable
-statsdir /var/log/ntpstats/
+# Enable this if you want statistics to be logged.
+#statsdir /var/log/ntpstats/
+
 statistics loopstats peerstats clockstats
-filegen  loopstats  file loopstats  type week  enable
-filegen  peerstats  file peerstats  type week  enable
-filegen  clockstats  file clockstats  type week  enable
+filegen loopstats file loopstats type day enable
+filegen peerstats file peerstats type day enable
+filegen clockstats file clockstats type day enable
 
-# Separate logfile for NTPD
-logfile /var/log/ntpd/ntpd.log
-logconfig =syncevents +peerevents +sysevents +allclock
+# Specify one or more NTP servers.
 
-# NTP Servers on own network
-#server 192.168.10.2 iburst prefer
-#server 192.168.30.2 iburst 
+# Use servers from the NTP Pool Project. Approved by Ubuntu Technical Board
+# on 2011-02-08 (LP: #104525). See http://www.pool.ntp.org/join.html for
+# more information.
+pool 0.ubuntu.pool.ntp.org iburst
+pool 1.ubuntu.pool.ntp.org iburst
+pool 2.ubuntu.pool.ntp.org iburst
+pool 3.ubuntu.pool.ntp.org iburst
 
-# Stratum-1 Servers to sync with - pick 4 to 6 good ones from
-# http://support.ntp.org/bin/view/Servers/
-#
-# DK - Denmark
-server ntp01.algon.dk iburst
-server ntp2.sptime.se iburst
-#server 80.71.132.103 iburst
-
-# DE - Germany
-server ntp2.fau.de iburst
-server clock2.infonet.ee iburst
-server rustime01.rus.uni-stuttgart.de  iburst
-server ntp01.hoberg.ch iburst
+# Use Ubuntu's ntp server as a fallback.
+pool ntp.ubuntu.com
 
 # Access control configuration; see /usr/share/doc/ntp-doc/html/accopt.html for
 # details.  The web page <http://support.ntp.org/bin/view/Support/AccessRestrictions>
 # might also be helpful.
 #
-# Note that restrict applies to both servers and clients, so a configuration
+# Note that "restrict" applies to both servers and clients, so a configuration
 # that might be intended to block requests from certain clients could also end
 # up blocking replies from your own upstream servers.
 
-# By default, exchange time with everybody, but do not allow configuration.
-restrict -4 default kod notrap nomodify nopeer noquery
-restrict -6 default kod notrap nomodify nopeer noquery
+# By default, exchange time with everybody, but don't allow configuration.
+restrict -4 default kod notrap nomodify nopeer noquery limited
+restrict -6 default kod notrap nomodify nopeer noquery limited
 
 # Local users may interrogate the ntp server more closely.
 restrict 127.0.0.1
 restrict ::1
 
+# Needed for adding pool entries
+restrict source notrap nomodify noquery
+
 # Clients from this (example!) subnet have unlimited access, but only if
 # cryptographically authenticated.
 #restrict 192.168.123.0 mask 255.255.255.0 notrust
+
 
 # If you want to provide time to your local subnet, change the next line.
 # (Again, the address is an example only.)
@@ -700,25 +791,24 @@ restrict ::1
 # next lines.  Please do this only if you trust everybody on the network!
 #disable auth
 #broadcastclient
-#leap file location
 leapfile /var/lib/ntp/leap-seconds.list
-EOF";
+__EOF__
 
     # Create folder for logfiles and let ntp own it
     echo -e "\e[36m-Create folder for logfiles and let ntp own it\e[0m";
-    sudo mkdir /var/log/ntpd
-    sudo chown ntp /var/log/ntpd
+    mkdir /var/log/ntpd
+    chown ntp /var/log/ntpd
     sync;    
     ## Restart NTPD
-    sudo systemctl restart ntp.service;
-    /usr/bin/logger 'configure_ntp()' -t 'Debian based Firewall';
+    systemctl restart ntp.service;
+    /usr/bin/logger 'configure_ntp() finished' -t 'Debian-FW-20211210';
 }
 
 configure_update-leap() {
+    /usr/bin/logger 'configure_update-leap()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_update-leap()\e[0m";
     echo -e "\e[36m-Creating service unit file\e[0m";
-
-    sudo sh -c "cat << EOF  > /lib/systemd/system/update-leap.service
+    cat << __EOF__  > /lib/systemd/system/update-leap.service
 # service file running update-leap
 # triggered by update-leap.timer
 
@@ -730,16 +820,15 @@ Documentation=man:update-leap
 User=ntp
 Group=ntp
 ExecStart=-/usr/bin/wget -O /var/lib/ntp/leap-seconds.list https://www.ietf.org/timezones/data/leap-seconds.list
-#ExecStart=-/usr/bin/update-leap -F -f /etc/ntp.conf -s http://www.ietf.org/timezones/data/leap-seconds.list /var/lib/ntp/leap-seconds.list
 WorkingDirectory=/var/lib/ntp/
 
 [Install]
 WantedBy=multi-user.target
-EOF";
+__EOF__
 
    echo -e "\e[36m-creating timer unit file\e[0m";
 
-   sudo sh -c "cat << EOF  > /lib/systemd/system/update-leap.timer
+   cat << __EOF__  > /lib/systemd/system/update-leap.timer
 # runs update-leap Weekly.
 [Unit]
 Description=Weekly job to check for updated leap-seconds.list file
@@ -755,39 +844,46 @@ Unit=update-leap.service
 
 [Install]
 WantedBy=multi-user.target
-EOF";
+__EOF__
 
     sync;
     echo -e "\e[36m-Get initial leap file and making sure timer and service can run\e[0m";
     wget -O /var/lib/ntp/leap-seconds.list http://www.ietf.org/timezones/data/leap-seconds.list;
-    chmod +x /usr/local/bin/update-leap;
-    sudo /usr/local/bin/update-leap;
-    sudo systemctl daemon-reload;
-    sudo systemctl enable update-leap.timer;
-    sudo systemctl enable update-leap.service;
-    sudo systemctl daemon-reload;
-    sudo systemctl start update-leap.timer;
-    sudo systemctl start update-leap.service;
-    /usr/bin/logger 'configure_update-leap()' -t 'Debian based Firewall';
+    chown ntp:ntp /var/lib/ntp/leap-seconds.list;
+    systemctl daemon-reload;
+    systemctl enable update-leap.timer;
+    systemctl enable update-leap.service;
+    systemctl daemon-reload;
+    systemctl start update-leap.timer;
+    systemctl start update-leap.service;
+    /usr/bin/logger 'configure_update-leap() finished' -t 'Debian-FW-20211210';
 }
 
 configure_iptables() {
+    /usr/bin/logger 'configure_iptables()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_iptables()\e[0m";
     echo -e "\e[32m-Creating iptables rules file\e[0m";
-    sudo sh -c "cat << EOF  >> /etc/network/iptables.rules
-# Debian Buster based Firewall
+    cat << __EOF__  >> /etc/network/iptables.rules
+#
+# Debian 10 (Buster) or 11 (Bullseye) based Firewall
 # IPTABLES Ruleset
-# Author: Martin Boller 2019
-# 
-# Based on the 2016 work by Joff Thyer, BHIS
-# 
-# Version 2.0 / 2019-11-29 (APU4 firewall)
+# Author: Martin Boller (c) 2021
+# bsecure.dk
+# Version 1.0 / 2016-04-21 
+# Version 1.1 / 2017-01-26
+# Version 2.0 / 2019-11-29 (APU)
+# Version 3.0 / 2021-12-10
 
 *nat
 :PREROUTING ACCEPT [0:0]
 :INPUT ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 :POSTROUTING ACCEPT [0:0]
+
+# To redirect HTTP traffic to Squid, un-comment below
+#-A PREROUTING ! -i enp1s0 -p tcp --dport 80 -j DNAT --to 192.168.10.1:3128
+#-A PREROUTING -i enp2s0 -s 192.168.10.0/24 ! -d 192.168.20.0/24 -j NOTRACK
+#-A PREROUTING -i enp3s0 -s 192.168.20.0/24 ! -d 192.168.10.0/24 -j NOTRACK
 
 # NAT everything from inside to outside
 -A POSTROUTING -s 192.168.0.0/16 -o enp1s0 -j MASQUERADE
@@ -803,7 +899,7 @@ COMMIT
 -A INPUT -i enp1s0 -s 0.0.0.0/8 -j LOG_DROPS
 -A INPUT -i enp1s0 -s 127.0.0.0/8 -j LOG_DROPS
 -A INPUT -i enp1s0 -s 10.0.0.0/8 -j LOG_DROPS
-# Using 192.168.10.0 and 192.168.20.0 nets internally so no dropping there -A INPUT -i enp1s0 -s 192.168.0.0/16 -j LOG_DROPS
+# Using 192.168.10.0 20.0 30.0 and 4.0 nets internally so no dropping there -A INPUT -i enp1s0 -s 192.168.0.0/16 -j LOG_DROPS
 -A INPUT -i enp1s0 -s 172.16.0.0/12 -j LOG_DROPS
 -A INPUT -i enp1s0 -s 224.0.0.0/4 -j LOG_DROPS
 
@@ -818,65 +914,77 @@ COMMIT
 -A INPUT -p tcp --tcp-flags ALL ALL -j LOG_DROPS
 
 ## Block specific persistent attackers
-## Cloud Best Solutions NOC
-#-A INPUT -s 92.119.160.90 -j LOG_DROPS
+#-A INPUT -s 5.188.206.164 -j LOG_DROPS
 
 ## Pass everything on loopback
 -A INPUT -i lo -j ACCEPT
 
-## DNS on all interfaces (NOT recommended)
-#-A INPUT -p udp --dport 53 -j ACCEPT
-#-A INPUT -p tcp --dport 53 -j ACCEPT
+# DHCP as inet side uses DHCP
+-A OUTPUT -o enp1s0 -p udp --sport 67:68 -j ACCEPT
+
+## GPSD on port 2947/TCP
+-A INPUT -i lo -p tcp --dport 2947 -j ACCEPT
+-A OUTPUT -p tcp --dport 2947 -j ACCEPT
 
 ## dns, dhcp, ntp, squid, icmp-echo
 -A INPUT ! -i enp1s0 -p udp --dport 53 -j ACCEPT
 -A INPUT ! -i enp1s0 -p tcp --dport 53 -j ACCEPT
 -A INPUT ! -i enp1s0 -p udp --dport 67:68 -j ACCEPT
--A INPUT ! -i enp1s0 -p udp --dport 123 -j ACCEPT
-## Allow DNS over TLS
--A INPUT ! -i enp1s0 -p tcp --dport 853 -j ACCEPT
+## RSYNC
+-A OUTPUT ! -o enp1s0 -p tcp --dport 873 -j ACCEPT
 
-## Allowing 123/udp both direction so we can be an NTP Server on the Internet too - for when You're a stratum1 server only
-#-A INPUT -i enp1s0 -p udp --dport 123 -j ACCEPT
-#-A OUTPUT -o enp1s0 -p udp --sport 123 -j ACCEPT
+## Allow DNS over TLS
+-A INPUT ! -i enp1s0 -p tcp --dport 953 -j ACCEPT
+
+## Allowing 123/udp both direction so we can be an NTP Server on the Internet
+-A INPUT -i enp1s0 -p udp --dport 123 -j LOG --log-prefix "ntppeers: " --log-level 7
+-A INPUT -i enp1s0 -p udp --dport 123 -j ACCEPT
+-A OUTPUT -o enp1s0 -p udp --sport 123 -j ACCEPT
 -A INPUT ! -i enp1s0 -p tcp --dport 3128 -j ACCEPT
 -A INPUT ! -i enp1s0 -p icmp -j ACCEPT
-
-# NFS Client
-#-A OUTPUT -p tcp --dport 2049 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
-#-A INPUT -p tcp --sport 2049 -m state --state ESTABLISHED -j ACCEPT
-#-A OUTPUT -p udp --dport 2049 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
-#-A INPUT -p udp --sport 2049 -m state --state ESTABLISHED -j ACCEPT
 
 ## SSH on internal interfaces
 -A INPUT -i enp2s0 -p tcp --dport 22 -j ACCEPT
 -A INPUT -i enp3s0 -p tcp --dport 22 -j ACCEPT
 -A INPUT -i enp4s0 -p tcp --dport 22 -j ACCEPT
--A INPUT -i wlan0 -p tcp --dport 22 -j ACCEPT
+-A INPUT -i wlp5s0 -p tcp --dport 22 -j ACCEPT
 -A OUTPUT -p tcp --dport 22 -j ACCEPT
 
-## RSYSLOG output to remote syslog - now changed to syslog
-#-A INPUT -i enp2s0 -p tcp --dport 5000 -j ACCEPT
-#-A OUTPUT -p tcp --dport 5000 -j ACCEPT
-
-## File- and Metricbeat output to logstash on port 6055
--A INPUT -i enp2s0 -p tcp --dport 6055 -j ACCEPT
-#-A INPUT -i enp3s0 -p tcp --dport 6055 -j ACCEPT
--A OUTPUT -p tcp --dport 6055 -j ACCEPT
+## Drop and log accesses to SSH on internet side 
+-A INPUT -i enp1s0 -p tcp --dport 22 -j LOG_DROPS
 
 ## Outbound initiated by gateway to internet
 -A OUTPUT -o lo -j ACCEPT
-#
+
+## Allowed ports outbound
+## DNS
 -A OUTPUT -p tcp --dport 53 -j ACCEPT
 -A OUTPUT -p udp --dport 53 -j ACCEPT
+-A OUTPUT -p tcp --sport 53 -j ACCEPT
+-A OUTPUT -p udp --sport 53 -j ACCEPT
+## whois
 -A OUTPUT -o enp1s0 -p tcp --dport 43 -j ACCEPT
+## HTTP(s)
 -A OUTPUT -o enp1s0 -p tcp --dport 80 -j ACCEPT
+-A OUTPUT -o enp1s0 -p tcp --dport 443 -j ACCEPT
+## NTP
 -A OUTPUT -o enp1s0 -p udp --dport 123 -j ACCEPT
 -A OUTPUT -o enp1s0 -p udp --sport 123 -j ACCEPT
--A OUTPUT -o enp1s0 -p tcp --dport 443 -j ACCEPT
+## submission
 -A OUTPUT -o enp1s0 -p tcp --dport 587 -j ACCEPT
+
 # DHCP as inet side uses DHCP
 -A OUTPUT -o enp1s0 -p udp --sport 67:68 -j ACCEPT
+
+# TIME/NTP stuff
+-A INPUT -i enp2s0 -p udp --dport 123 -j ACCEPT
+-A INPUT -i enp3s0 -p udp --dport 123 -j ACCEPT
+-A INPUT -i enp4s0 -p udp --dport 123 -j ACCEPT
+-A INPUT -i wlp5s0 -p udp --dport 123 -j ACCEPT
+-A OUTPUT -o enp2s0 -p udp --dport 123 -j ACCEPT
+-A OUTPUT -o enp3s0 -p udp --dport 123 -j ACCEPT
+-A OUTPUT -o enp4s0 -p udp --dport 123 -j ACCEPT
+-A OUTPUT -o wlp5s0 -p udp --dport 123 -j ACCEPT
 
 ## Any outbound tcp, udp, and icmp-echo to the inside network
 -A OUTPUT ! -o enp1s0 -p udp --dport 68 -j ACCEPT
@@ -888,9 +996,7 @@ COMMIT
 -A OUTPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 -A OUTPUT -j LOG_DROPS
 #############################################################################
-
 ## IP forwarding rules: forward all internal networks outbound to enp1s0
-
 ## Internal Networks
 -A FORWARD ! -i enp1s0 -s 192.168.0.0/16 -p tcp -j ACCEPT
 -A FORWARD ! -i enp1s0 -s 192.168.0.0/16 -p udp -j ACCEPT
@@ -898,6 +1004,7 @@ COMMIT
 -A FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 -A FORWARD -j LOG_DROPS
 
+##############################################################################
 ## LOGGING
 ## get rid of broadcast noise
 -A LOG_DROPS -d 255.255.255.255 -j DROP
@@ -909,36 +1016,50 @@ COMMIT
 
 ## Commit all of the above rules
 COMMIT
-EOF";
+__EOF__
 
+    #Apply firewall rules before (pre-up) networking starts
+    # to be secure all the time
     echo -e "\e[36m-Script applying iptables rules\e[0m";
-    sudo sh -c "cat << EOF  >> /etc/network/if-up.d/firewallrules
+    cat << __EOF__  >> /etc/network/if-pre-up.d/firewallrules
 #!/bin/sh
 iptables-restore < /etc/network/iptables.rules
 exit 0
-EOF";
-    sync;
-    ## make the script executable
-    chmod +x /etc/network/if-up.d/firewallrules
+__EOF__
 
-    sudo sh -c "cat << EOF  >> /etc/network/iptables.rules
+    # blackhole RFC1918 networks not in use
+    cat << __EOF__  >> /etc/network/if-up.d/blacholerfc1918
+#! /bin/bash
+# add routes for blackhole
+route add -net 10.0.0.0/8 gw 127.0.0.1 metric 200
+route add -net 172.16.0.0/12 gw 127.0.0.1 metric 200
+#route add -net 192.168.0.0/16 gw 127.0.0.1 metric 200
+route add -net 224.0.0.0/4 gw 127.0.0.1 metric 200
+exit 0
+__EOF__
+    sync;
+    ## make the scripts executable
+    chmod +x /etc/network/if-pre-up.d/firewallrules;
+    chmod +x /etc/network/if-up.d/blacholerfc1918;
+    /usr/bin/logger 'configure_iptables() finished' -t 'Debian-FW-20211210';
+}
+
+configure_interfaces() {
+    /usr/bin/logger 'configure_interfaces()' -t 'Debian-FW-20211210';
+    echo -e "\e[32mconfigure_interfaces()\e[0m";
+    echo -e "\e[36m-Create interfaces file\e[0m";
+    ## Important this will overwrite your current interfaces file and may mess with all your networking on this system
+    cat << __EOF__  >> /etc/network/interfaces
 # This file describes the network interfaces available on your system
 # and how to activate them. For more information, see interfaces(5).
 
 source /etc/network/interfaces.d/*
 
 # The loopback network interface
-auto lo enp1s0 enp2s0 enp3s0 enp4s0 wlp5s0
+auto lo enp2s0 enp3s0 enp4s0 wlp5s0
 
 # Loopback interface
 iface lo inet loopback
-
-# add itables rules pre-nics and add routes for blackhole
-pre-up iptables-restore </etc/network/iptables.rules
-up route add -net 10.0.0.0/8 gw 127.0.0.1 metric 200
-up route add -net 172.16.0.0/12 gw 127.0.0.1 metric 200
-#up route add -net 192.168.0.0/16 gw 127.0.0.1 metric 200
-up route add -net 224.0.0.0/4 gw 127.0.0.1 metric 200
 
 # The primary network interface
 # WAN - Internet side
@@ -946,10 +1067,11 @@ allow-hotplug enp1s0
 iface enp1s0 inet dhcp
 # Actived with MAC Address 00:20:91:97:dc:95 - change permanent MAC
 hwaddress ether 00:20:91:97:dc:95
-dns-nameservers 192.168.10.1, 192.168.20.1
+dns-nameservers 192.168.10.1
 
 allow-hotplug enp2s0
 iface enp2s0 inet static
+  hwaddress ether 00:20:91:97:ce:02
   address 192.168.10.1
   network 192.168.10.0
   netmask 255.255.255.0
@@ -957,6 +1079,7 @@ iface enp2s0 inet static
 
 allow-hotplug enp3s0
 iface enp3s0 inet static
+  hwaddress ether 00:20:91:97:ce:03
   address 192.168.20.1
   network 192.168.20.0
   netmask 255.255.255.0
@@ -964,87 +1087,27 @@ iface enp3s0 inet static
 
 allow-hotplug enp4s0
 iface enp4s0 inet static
+  hwaddress ether 00:20:91:97:ce:04
   address 192.168.30.1
   network 192.168.30.0
   netmask 255.255.255.0
   dns-nameservers 192.168.30.1
 
-allow-hotplug wlan0
-iface wlan0 inet static
+allow-hotplug wlp5s0
+iface wlp5s0 inet static
+  hwaddress ether 00:20:91:97:ce:05
   address 192.168.40.1
   network 192.168.40.0
   netmask 255.255.255.0
   dns-nameservers 192.168.40.1
-  EOF";
-    /usr/bin/logger 'configure_iptables()' -t 'Debian based Firewall';
-}
-
-configure_interfaces() {
-    echo -e "\e[32mconfigure_interfaces()\e[0m";
-    echo -e "\e[36m-Create interfaces file\e[0m";
-    ## Important this will overwrite your current interfaces file and may mess with all your networking on this system
-    sudo sh -c "cat << EOF  >> /etc/network/interfaces
-# This file describes the network interfaces available on your system
-# and how to activate them. For more information, see interfaces(5).
-
-source /etc/network/interfaces.d/*
-
-# The loopback network interface
-auto lo enp1s0 enp2s0 enp3s0 enp4s0 wlan0
-
-# Loopback interface
-iface lo inet loopback
-
-# add itables rules 'pre-up' and add routes for blackhole
-pre-up iptables-restore </etc/network/iptables.rules
-up route add -net 10.0.0.0/8 gw 127.0.0.1 metric 200
-up route add -net 172.16.0.0/12 gw 127.0.0.1 metric 200
-#up route add -net 192.168.0.0/16 gw 127.0.0.1 metric 200
-up route add -net 224.0.0.0/4 gw 127.0.0.1 metric 200
-
-# The primary network interface
-# WAN - Internet side
-allow-hotplug enp1s0
-iface enp1s0 inet dhcp
-# If your ISP require a specific MAC address - change permanent MAC
-  #hwaddress ether 00:20:DE:AD:BE:EF
-  dns-nameservers 127.0.0.1
-
-allow-hotplug enp2s0
-iface enp2s0 inet static
-  address 192.168.10.1
-  network 192.168.10.0
-  netmask 255.255.255.0
-  dns-nameservers 192.168.10.1
-
-allow-hotplug enp3s0
-iface enp3s0 inet static
-  address 192.168.20.1
-  network 192.168.20.0
-  netmask 255.255.255.0
-  dns-nameservers 192.168.20.1
-
-allow-hotplug enp4s0
-iface enp4s0 inet static
-  address 192.168.30.1
-  network 192.168.30.0
-  netmask 255.255.255.0
-  dns-nameservers 192.168.30.1
-
-allow-hotplug wlan0
-iface wlan0 inet static
-  address 192.168.40.1
-  network 192.168.40.0
-  netmask 255.255.255.0
-  dns-nameservers 192.168.40.1
-EOF";
-    /usr/bin/logger 'configure_interfaces()' -t 'Debian based Firewall';
+__EOF__
+    /usr/bin/logger 'configure_interfaces() finished' -t 'Debian-FW-20211210';
 }
 
 configure_motd() {
     echo -e "\e[32mconfigure_motd()\e[0m";
     echo -e "\e[36m-Create motd file\e[0m";
-    sudo sh -c "cat << EOF  >> /etc/motd
+    cat << __EOF__  >> /etc/motd
 
 *******************************************
 ***                                     ***
@@ -1058,57 +1121,63 @@ configure_motd() {
              (\__/) ||
              (•ㅅ•) ||
             /  　  づ
-EOF";
+__EOF__
     
+    # do not show motd twice
+    sed -ie 's/session    optional     pam_motd.so  motd=\/etc\/motd/#session    optional     pam_motd.so  motd=\/etc\/motd/' /etc/pam.d/sshd
     sync;
-    /usr/bin/logger 'configure_motd()' -t 'Debian based Firewall';
+    /usr/bin/logger 'configure_motd() finished' -t 'Debian-FW-20211210';
 }
 
 install_ssh_keys() {
+    /usr/bin/logger 'install_ssh_keys()' -t 'Debian-FW-20211210';
     echo -e "\e[32minstall_ssh_keys()\e[0m";
     echo -e "\e[36m-Add public key to authorized_keys file\e[0m";
     # Echo add SSH public key for root logon - change this to your own key
-    sudo mkdir /root/.ssh
-    echo "ssh-ed25519 $SSH_KEY" | sudo tee -a /root/.ssh/authorized_keys
-    sudo chmod 700 /root/.ssh
-    sudo chmod 600 /root/.ssh/authorized_keys
+    mkdir /root/.ssh
+    echo "ssh-ed25519 $SSH_KEY" | tee -a /root/.ssh/authorized_keys
+    chmod 700 /root/.ssh
+    chmod 600 /root/.ssh/authorized_keys
     sync;
-    /usr/bin/logger 'install_ssh_keys()' -t 'Debian based Firewall';
+    /usr/bin/logger 'install_ssh_keys() finished' -t 'Debian-FW-20211210';
 }
 
 configure_sshd() {
+    /usr/bin/logger 'configure_sshd()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_sshd()\e[0m";
     ## Generate new host keys
     echo -e "\e[36m-Delete and recreate host SSH keys\e[0m";
     rm -v /etc/ssh/ssh_host_*;
     dpkg-reconfigure openssh-server;
     sync;
-    /usr/bin/logger 'configure_sshd()' -t 'Debian based Firewall';
+    /usr/bin/logger 'configure_sshd() finished' -t 'Debian-FW-20211210';
 }
 
 disable_timesyncd() {
+    /usr/bin/logger 'disable_timesyncd()' -t 'Debian-FW-20211210';
     echo -e "\e[32mDisable_timesyncd()\e[0m";
-    sudo systemctl stop systemd-timesyncd
-    sudo systemctl daemon-reload
-    sudo systemctl disable systemd-timesyncd
-    /usr/bin/logger 'disable_timesyncd()' -t 'Debian based Firewall';
+    systemctl stop systemd-timesyncd
+    systemctl daemon-reload
+    systemctl disable systemd-timesyncd
+    /usr/bin/logger 'disable_timesyncd() finished' -t 'Debian-FW-20211210';
 }
 
 configure_dhcp_ntp() {
+    /usr/bin/logger 'configure_dhcp_ntp()' -t 'Debian-FW-20211210';
     echo -e "\e[32mconfigure_dhcp_ntp()\e[0m";
     ## Remove ntp and timesyncd exit hooks to cater for server using DHCP
     echo -e "\e[36m-Remove scripts utilizing DHCP\e[0m";
-    sudo rm /etc/dhcp/dhclient-exit-hooks.d/ntp
-    sudo rm /etc/dhcp/dhclient-exit-hooks.d/timesyncd
+    rm /etc/dhcp/dhclient-exit-hooks.d/ntp
+    rm /etc/dhcp/dhclient-exit-hooks.d/timesyncd
     ## Remove ntp.conf.dhcp if it exist
     echo -e "\e[36m-Removing ntp.conf.dhcp\e[0m";    
-    sudo rm /run/ntp.conf.dhcp
+    rm /run/ntp.conf.dhcp
     ## Disable NTP option for dhcp
     echo -e "\e[36m-Disable ntp_servers option from dhclient\e[0m";   
-    sudo sed -i -e "s/option ntp_servers/#option ntp_servers/" /etc/dhcpcd.conf;
+    sed -i -e "s/option ntp_servers/#option ntp_servers/" /etc/dhcpcd.conf;
     ## restart NTPD yet again after cleaning up DHCP
-    sudo systemctl restart ntp
-    /usr/bin/logger 'configure_dhcp_ntp()' -t 'Debian based Firewall';
+    systemctl restart ntp
+    /usr/bin/logger 'configure_dhcp_ntp() finished' -t 'Debian-FW-20211210';
 }
 
 finish_reboot() {
@@ -1120,14 +1189,53 @@ finish_reboot() {
             sleep 1
             : $((secs--))
         done;
-    sudo sync;
+    sync;
     echo -e
     echo -e "\e[1;31mREBOOTING!\e[0m";
-    /usr/bin/logger 'finalized installation of Debian based Firewall' -t 'Debian based Firewall'
+    /usr/bin/logger 'finalized installation of Debian-FW-20211210' -t 'Debian-FW-20211210'
     reboot;
 }
 
+configure_hostapd() {
+    /usr/bin/logger 'configure_hostapd()' -t 'Debian-FW-20211210'
+    # Install hostapd
+    apt-get -y install hostapd;
+    # Create hostapd config file
+    read -s "SSID for wireless: "  mySSID;
+    read -s "WPA Password for wireless: "  myWPAPASSPHRASE;
+    read -s "ISO Country code for wireless, i.e. DK: "  COUNTRY_CODE;
+
+    cat << __EOF__  >  /etc/hostapd/hostapd.conf
+interface=wlp5s0
+driver=nl80211
+
+ssid=$mySSID
+hw_mode=b
+channel=0
+max_num_sta=128
+auth_algs=1
+disassoc_low_ack=1
+wpa_ptk_rekey=3600
+country_code=$COUNTRY_CODE
+
+ieee80211ac=1
+ieee80211n=1
+
+wpa=2
+wpa_key_mgmt=WPA-PSK
+wpa_passphrase=$myWPAPASSPHRASE
+wpa_pairwise=CCMP
+
+logger_syslog=127
+logger_syslog_level=2
+logger_stdout=127
+logger_stdout_level=2
+__EOF__
+    /usr/bin/logger 'configure_hostapd()' -t 'Debian-FW-20211210'
+}
+
 install_alerta() {
+    /usr/bin/logger 'install_alerta()' -t 'Debian-FW-20211210'
     export DEBIAN_FRONTEND=noninteractive;
     apt-get -y install python3-pip python3-venv;
     id alerta || (groupadd alerta && useradd -g alerta alerta);
@@ -1137,23 +1245,25 @@ install_alerta() {
     /opt/alerta/bin/pip install alerta;
     mkdir /home/alerta/;
     chown -R alerta:alerta /home/alerta;
+    /usr/bin/logger 'install_alerta() finished' -t 'Debian-FW-20211210'
 }
 
-configure_heartbeat() {
-    echo "Configure Heartbeat Alerts on Alerta Server";
+configure_alerta_heartbeat() {
+    /usr/bin/logger 'configure_alerta_heartbeat()' -t 'Debian-FW-20211210'
+    echo "configure_alerta_heartbeat()";
     export DEBIAN_FRONTEND=noninteractive;
     id alerta || (groupadd alerta && useradd -g alerta alerta);
     mkdir /home/alerta/;
     chown -R alerta:alerta /home/alerta;
     # Create Alerta configuration file
-    sudo sh -c "cat << EOF  >  /home/alerta/.alerta.conf
+    cat << __EOF__  >  /home/alerta/.alerta.conf
 [DEFAULT]
 endpoint = http://$ALERTA_SERVER/api
 key = $ALERTA_APIKEY
-EOF";
+__EOF__
 
     # Create  Service
-    sudo sh -c "cat << EOF  >  /lib/systemd/system/alerta-heartbeat.service
+    cat << __EOF__  >  /lib/systemd/system/alerta-heartbeat.service
 [Unit]
 Description=Alerta Heartbeat service
 Documentation=https://http://docs.alerta.io/en/latest/deployment.html#house-keeping
@@ -1168,9 +1278,9 @@ WorkingDirectory=/home/alerta
 
 [Install]
 WantedBy=multi-user.target
-EOF";
+__EOF__
 
-   sudo sh -c "cat << EOF  >  /lib/systemd/system/alerta-heartbeat.timer
+   cat << __EOF__  >  /lib/systemd/system/alerta-heartbeat.timer
 [Unit]
 Description=sends heartbeats to alerta every 60 seconds
 Documentation=https://http://docs.alerta.io/en/latest/deployment.html#house-keeping
@@ -1182,13 +1292,14 @@ Unit=alerta-heartbeat.service
 
 [Install]
 WantedBy=multi-user.target
-EOF";
+__EOF__
     systemctl daemon-reload;
     systemctl enable alerta-heartbeat.timer;
     systemctl enable alerta-heartbeat.service;
     systemctl start alerta-heartbeat.timer;
     systemctl start alerta-heartbeat.service;
-    /usr/bin/logger 'Configured heartbeat service' -t 'Alerta Server)';
+    echo "configure_alerta_heartbeat() finished";
+    /usr/bin/logger 'configure_alerta_heartbeat() finished' -t 'Debian-FW-20211210'
 }
 
 
@@ -1198,7 +1309,7 @@ EOF";
 main() {
 
 echo -e "\e[32m-----------------------------------------------------\e[0m";
-echo -e "\e[32mStarting Installation of Debian based Firewall\e[0m";
+echo -e "\e[32mStarting Installation of Debian-FW-20211210\e[0m";
 echo -e "\e[32m-----------------------------------------------------\e[0m";
 echo -e;
 
@@ -1219,9 +1330,13 @@ configure_ntp;
 configure_update-leap;
 configure_dhcp_ntp;
 
+# CrowdSec setup
+install_crowdsec;
+configure_crowdsec;
+
 # DShield setup
-install_dshield;
-configure_dshield;
+#install_dshield;
+#configure_dshield;
 
 # Networking
 configure_interfaces;
@@ -1229,7 +1344,9 @@ configure_iptables;
 configure_ipfwd;
 configure_dhcp_server;
 configure_bind;
+configure_threatfox;
 configure_resolv;
+configure_hostapd;
 
 # CPU
 configure_cpu;
@@ -1245,18 +1362,18 @@ configure_exim;
 # Logging
 ## Syslog
 configure_rsyslog;
-## Filebeat
-install_filebeat;
-configure_filebeat;
+## Filebeat if you run the elastic stack or openstack
+#install_filebeat;
+#configure_filebeat;
 ## logrotate
 configure_logrotate;
 
 # If using alerta.io install alerta and send heartbeats to alertaserver
-install_alerta;
-configure_heartbeat;
+#install_alerta;
+#configure_alerta_heartbeat;
 
 ## Finish with encouraging message, then reboot
-echo -e "\e[32mInstallation and configuration of Debian based Firewall complete.\e[0m";
+echo -e "\e[32mInstallation and configuration of Debian-FW-20211210 complete.\e[0m";
 echo -e "\e[1;31mAfter reboot, please verify everything works correctly and that nothing listens on the external interface\e[0m";
 echo -e;
 
@@ -1271,38 +1388,14 @@ exit 0
 # Information: Use these commands for t-shooting                                                #
 #################################################################################################
 #
-# Check syslog for 'finalized installation of stratum-1 server'
-#   then at least the script finished, but there should also be
-#   a log entry for each routine called (main)
-#
-# dmesg | grep pps
-# sudo ppstest /dev/pps0
-# sudo ppswatch -a /dev/pps0
-#
-# sudo gpsd -D 5 -N -n /dev/ttyAMA0 /dev/pps0 -F /var/run/gpsd.sock
-# sudo systemctl stop gpsd.*
-# sudo killall -9 gpsd
-# sudo dpkg-reconfigure -plow gpsd
-#
-# cgps -s
-# gpsmon
-# ipcs -m
-# ntpshmmon
-#
-# ntpq -crv -pn
-# watch -n 10 'ntpstat; ntpq -p -crv; ntptime;'
-#
-# If HW clock installed
-# dmesg | grep rtc
-# hwclock --systohc --utc
-# hwclock --show --utc --debug
-# cat /sys/class/rtc/rtc0/date
-# cat /sys/class/rtc/rtc0/time
-# cat /sys/class/rtc/rtc0/since_epoch
-# cat /sys/class/rtc/rtc0/name
-# i2cdetect -y 1
+# BIND
+# Check zone status
+# rndc zonestatus threatfox.rpz
+# rndc zonestatus 10.168.192.in-addr.arpa
+# systemctl status bind9
+# 
 #
 # Update system
-# export DEBIAN_FRONTEND=noninteractive; apt update; apt dist-upgrade -y; echo y | rpi-update;
+# time (export DEBIAN_FRONTEND=noninteractive; apt update; apt dist-upgrade -y)
 #
 #################################################################################################
