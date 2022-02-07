@@ -19,16 +19,16 @@
 get_information() {
     /usr/bin/logger 'get_information()' -t 'Debian-FW-20211210';
     echo -e "\e[32mget_information()\e[0m";
-    read -s "FQDN of mailserver: "  SMTP_SERVER;
-    read -s "Port for mailserver: "  SMTP_SERVER_PORT;
-    read -s "Outgoing Sender Email Address: "  MAIL_ADDRESS;
-    read -s "Domain for mailserver: "  MAIL_DOMAIN;
-    read -s "Internal Domain: "  INTERNAL_DOMAIN;
-    read -s "Firewall host name: "  FIREWALL_NAME;
-#    read -s "DSHIELD userid: "  DSHIELD_USERID;
-#    read -s "ALERTA server hostname: "  ALERTA_SERVER;
-#    read -s "ALERTA API Key: "  ALERTA_APIKEY;
-    read -s "ED25519 SSH Public key: "  SSH_KEY;
+    read -p "FQDN of outgoing mailserver: " MAIL_SERVER;
+    read -p "Port for outgoing mailserver: " MAIL_SERVER_PORT;
+    read -p "Outgoing Sender Email Address: " MAIL_ADDRESS;
+    read -sp "Password for sender email address: " MAIL_PASSWORD;
+    read -p "Your Internal Domain: " INTERNAL_DOMAIN;
+    read -p "Firewall host name: " FIREWALL_NAME;
+#    read -p "DSHIELD userid: "  DSHIELD_USERID;
+#    read -p "ALERTA server hostname: "  ALERTA_SERVER;
+#    read -p "ALERTA API Key: "  ALERTA_APIKEY;
+    read -p "ED25519 SSH Public key: " SSH_KEY;
     hostnamectl set-hostname $FIREWALL_NAME.$INTERNAL_DOMAIN;
     /usr/bin/logger 'get_information() finished' -t 'Debian-FW-20211210';
 }
@@ -449,6 +449,7 @@ configure_crowdsec() {
     cscli parsers install crowdsecurity/geoip-enrich;
     cscli scenarios install crowdsecurity/iptables-scan-multi_ports;
     cscli scenarios install crowdsecurity/ssh-bf;
+    cscli collections install crowdsecurity/linux;
     cscli collections install crowdsecurity/iptables;
     cscli postoverflows install crowdsecurity/rdns;
     # configure crowdsec to read iptables.log, specific to this firewall build, or it won't pick up log data
@@ -456,6 +457,9 @@ configure_crowdsec() {
     sed -ie '/filenames:/a \  - /var/log/iptables.log' /etc/crowdsec/acquis.yaml;
     # Running 'sudo systemctl reload crowdsec' for the new configuration to be effective.
     systemctl reload crowdsec.service;
+    # Enable auto complete for BASH
+    source /etc/profile;
+    source <(cscli completion bash);
     /usr/bin/logger 'configure_crowdsec() finished' -t 'Debian-FW-20211210';
 }
 
@@ -1201,9 +1205,9 @@ configure_hostapd() {
     # Install hostapd
     apt-get -y install hostapd;
     # Create hostapd config file
-    read -s "SSID for wireless: "  mySSID;
-    read -s "WPA Password for wireless: "  myWPAPASSPHRASE;
-    read -s "ISO Country code for wireless, i.e. DK: "  COUNTRY_CODE;
+    read -p "SSID for wireless: "  mySSID;
+    read -p "WPA Password for wireless: "  myWPAPASSPHRASE;
+    read -p "ISO Country code for wireless, i.e. DK: "  COUNTRY_CODE;
 
     cat << __EOF__  >  /etc/hostapd/hostapd.conf
 interface=wlp5s0
