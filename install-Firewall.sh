@@ -1258,7 +1258,7 @@ interface=wlp5s0
 driver=nl80211
 
 ssid=$mySSID
-hw_mode=b
+hw_mode=g
 channel=0
 max_num_sta=128
 auth_algs=1
