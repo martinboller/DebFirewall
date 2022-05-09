@@ -5,10 +5,11 @@
 # Author:       Martin Boller                                       #
 #                                                                   #
 # Email:        martin@bollers.dk                                   #
-# Last Update:  2022-02-13                                          #
-# Version:      2.00                                                #
+# Last Update:  2022-05-09                                          #
+# Version:      2.10                                                #
 #                                                                   #
-# Changes:      Crowdsec implementation (2.00)                      #
+# Changes:      Tested on APU4D4 (2.10)                             #
+#               Crowdsec implementation (2.00)                      #
 #               Sysfsutils/performance CPU governor (1.30)          #
 #               IP forwarding routine (1.20)                        #
 #               Added get_information (1.10)                        #
@@ -66,7 +67,7 @@ options {
 	check-names master ignore;
 	auth-nxdomain no;    # conform to RFC1035
 	listen-on-v6 { none; };
-	filter-aaaa-on-v4 yes;
+	#filter-aaaa-on-v4 yes;
 	listen-on { 127.0.0.1; 192.168.10.1; 192.168.20.1; 192.168.30.1; 192.168.40.1; };
 	allow-query { homenet; };
 	recursion yes;
@@ -76,7 +77,7 @@ options {
     empty-zones-enable yes;
     response-policy {
 		#zone "rpz.block.misp";
-		zone "threatfox.rpz";
+		#zone "threatfox.rpz";
     };
 };
 __EOF__
@@ -116,7 +117,7 @@ zone "10.168.192.in-addr.arpa" {
         type master;
        	check-names ignore;
 //	allow-update { key rndc-key; };	
-        allow-update { 192.168.10.0/8; };
+        allow-update { 192.168.10.0/24; };
         allow-transfer { 192.168.10.1; localhost; };
         file "/var/lib/bind/db.10.168.192.in-addr.arpa";
 	};
@@ -125,7 +126,7 @@ zone "20.168.192.in-addr.arpa" {
         type master;
         check-names ignore;
 //        allow-update { key rndc-key; };
-        allow-update { 192.168.20.0/8; };
+        allow-update { 192.168.20.0/24; };
         allow-transfer { 192.168.10.1; localhost; };
         file "/var/lib/bind/db.20.168.192.in-addr.arpa";
 	};
@@ -134,7 +135,7 @@ zone "30.168.192.in-addr.arpa" {
         type master;
         check-names ignore;
 //        allow-update { key rndc-key; };
-        allow-update { 192.168.30.0/8; };
+        allow-update { 192.168.30.0/24; };
         allow-transfer { 192.168.10.1; localhost; };
         file "/var/lib/bind/db.30.168.192.in-addr.arpa";
         };
@@ -143,7 +144,7 @@ zone "40.168.192.in-addr.arpa" {
         type master;
         check-names ignore;
 //        allow-update { key rndc-key; };
-        allow-update { 192.168.40.0/8; };
+        allow-update { 192.168.40.0/24; };
         allow-transfer { 192.168.10.1; localhost; };
         file "/var/lib/bind/db.40.168.192.in-addr.arpa";
         };
@@ -444,9 +445,9 @@ install_crowdsec() {
     # Add repo
     curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash;
     #install crowdsec core daemon
-    apt-get -y install crowdsec;
+    apt-get -qq -y install crowdsec;
     # install firewall bouncer
-    apt-get -y install crowdsec-firewall-bouncer-iptables;
+    apt-get -qq -y install crowdsec-firewall-bouncer-iptables;
     /usr/bin/logger 'install_crowdsec() finished' -t 'Debian-FW-20220213';
 }
 
@@ -538,7 +539,7 @@ install_filebeat() {
     #apt-key adv --fetch-keys https://artifacts.elastic.co/GPG-KEY-elasticsearch;
     echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list;
     apt-get update;
-    apt-get -y install filebeat;
+    apt-get -qq -y install filebeat;
     systemctl daemon-reload;
     systemctl enable filebeat.service;
     /usr/bin/logger 'install_filebeat() finished' -t 'Debian-FW-20220213';
@@ -571,6 +572,26 @@ configure_timezone() {
     sh -c "echo 'Etc/UTC' > /etc/timezone";
     dpkg-reconfigure -f noninteractive tzdata;
     /usr/bin/logger 'configure_timezone() finished' -t 'Debian-FW-20220213';
+}
+
+configure_sources() {
+    /usr/bin/logger 'configure_sources()' -t 'Debian-FW-20220213';
+    echo -e "\e[32mconfigure_sources()\e[0m";
+    echo -e "\e[36m-sources.list\e[0m";
+    cat << __EOF__  > /var/apt/sources.list
+deb http://deb.debian.org/debian/ bullseye main contrib non-free
+deb-src http://deb.debian.org/debian/ bullseye main contrib non-free
+
+deb http://security.debian.org/debian-security bullseye-security main contrib non-free
+deb-src http://security.debian.org/debian-security bullseye-security main contrib non-free
+
+# bullseye-updates, previously known as 'volatile'
+deb http://deb.debian.org/debian/ bullseye-updates main contrib non-free
+deb-src http://deb.debian.org/debian/ bullseye-updates main contrib non-free
+
+__EOF__
+    sync;
+    echo -e "\e[32mconfigure_sources() finished\e[0m";
 }
 
 configure_logrotate() {
@@ -648,12 +669,12 @@ install_prerequisites() {
     echo -e "\e[1;32mOperating System: $OS Version: $VER\e[0m";
     # Install prerequisites
     echo -e "\e[36m-prerequisites...\e[0m";
-    apt-get install libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4 sysfsutils iptables vnstat iftop;
+    apt-get -qq -y install net-tools libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4 sysfsutils iptables vnstat iftop;
     # Install some basic tools on a Debian net install
     /usr/bin/logger '..Install some basic tools on a Debian net install' -t 'Debian-FW-20220213';
-    apt-get -y install adduser wget whois unzip apt-transport-https ca-certificates curl gnupg2 software-properties-common dnsutils;
-    apt-get -y install bash-completion debian-goodies dirmngr ethtool firmware-iwlwifi firmware-linux-free firmware-linux-nonfree;
-    apt-get -y install sudo flashrom geoip-database unattended-upgrades python3 python3-pip;
+    apt-get -qq -y install adduser wget whois unzip apt-transport-https ca-certificates curl gnupg2 software-properties-common dnsutils;
+    apt-get -qq -y install bash-completion debian-goodies dirmngr ethtool firmware-iwlwifi firmware-linux-free firmware-linux-nonfree;
+    apt-get -qq -y install sudo flashrom geoip-database unattended-upgrades python3 python3-pip;
     python3 -m pip install --upgrade pip;
     # Set correct locale
     systemctl daemon-reload;
@@ -1251,7 +1272,7 @@ finish_reboot() {
 configure_hostapd() {
     /usr/bin/logger 'configure_hostapd()' -t 'Debian-FW-20220213'
     # Install hostapd
-    apt-get -y install hostapd;
+    apt-get -qq -y install hostapd;
     # Create hostapd config file
     cat << __EOF__  >  /etc/hostapd/hostapd.conf
 interface=wlp5s0
@@ -1285,7 +1306,7 @@ __EOF__
 install_alerta() {
     /usr/bin/logger 'install_alerta()' -t 'Debian-FW-20220213'
     export DEBIAN_FRONTEND=noninteractive;
-    apt-get -y install python3-pip python3-venv;
+    apt-get -qq -y install python3-pip python3-venv;
     id alerta || (groupadd alerta && useradd -g alerta alerta);
     cd /opt;
     python3 -m venv alerta;
@@ -1365,6 +1386,7 @@ echo -e;
 get_information;
 
 # Install and configure the basics
+configure_sources;
 install_updates;
 install_prerequisites;
 configure_locale;
