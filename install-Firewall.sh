@@ -578,7 +578,7 @@ configure_sources() {
     /usr/bin/logger 'configure_sources()' -t 'Debian-FW-20220213';
     echo -e "\e[32mconfigure_sources()\e[0m";
     echo -e "\e[36m-sources.list\e[0m";
-    cat << __EOF__  > /var/apt/sources.list
+    cat << __EOF__  > /etc/apt/sources.list
 deb http://deb.debian.org/debian/ bullseye main contrib non-free
 deb-src http://deb.debian.org/debian/ bullseye main contrib non-free
 
