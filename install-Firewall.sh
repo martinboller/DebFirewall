@@ -672,7 +672,7 @@ install_prerequisites() {
     apt-get -qq -y install net-tools libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4 sysfsutils iptables vnstat iftop;
     # Install some basic tools on a Debian net install
     /usr/bin/logger '..Install some basic tools on a Debian net install' -t 'Debian-FW-20220213';
-    apt-get -qq -y install adduser wget whois unzip apt-transport-https ca-certificates curl gnupg2 software-properties-common dnsutils;
+    apt-get -qq -y install sudo adduser wget whois unzip apt-transport-https ca-certificates curl gnupg2 software-properties-common dnsutils;
     apt-get -qq -y install bash-completion debian-goodies dirmngr ethtool firmware-iwlwifi firmware-linux-free firmware-linux-nonfree;
     apt-get -qq -y install sudo flashrom geoip-database unattended-upgrades python3 python3-pip;
     python3 -m pip install --upgrade pip;
@@ -1268,6 +1268,13 @@ finish_reboot() {
     reboot;
 }
 
+configure_grubserial() {
+    /usr/bin/logger 'configure_grubserial()' -t 'Debian-FW-20220213'
+    echo -e "\e[32mconfigure_grubserial()\e[0m";
+    echo 'GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8"' | tee -a /etc/default/grub
+    update-grub;
+    echo -e "\e[32mconfigure_grubserial()\e[0m";
+}
 
 configure_hostapd() {
     /usr/bin/logger 'configure_hostapd()' -t 'Debian-FW-20220213'
@@ -1381,6 +1388,8 @@ echo -e "\e[32m-----------------------------------------------------\e[0m";
 echo -e "\e[32mStarting Installation of Debian-FW-20220213\e[0m";
 echo -e "\e[32m-----------------------------------------------------\e[0m";
 echo -e;
+
+configure_grubserial;
 
 # Ask for user input
 get_information;
