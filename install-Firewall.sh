@@ -36,6 +36,7 @@ get_information() {
     read -p "ISO Country code for wireless, i.e. DK: "  COUNTRY_CODE;
     # Set FQDN
     hostnamectl set-hostname $FIREWALL_NAME.$INTERNAL_DOMAIN;
+    echo -e "\e[32mget_information() finished\e[0m";
     /usr/bin/logger 'get_information() finished' -t 'Debian-FW-20220213';
 }
 
@@ -44,20 +45,21 @@ configure_locale() {
     echo -e "\e[32mconfigure_locale()\e[0m";
     echo -e "\e[36m-Configure locale (default:C.UTF-8)\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
-    update-locale LANG=en_GB.utf8;
+    update-locale LANG=en_GB.utf8 > /dev/null 2>&1
     cat << __EOF__  > /etc/default/locale
 # /etc/default/locale
 LANG=C.UTF-8
 LANGUAGE=C.UTF-8
 LC_ALL=C.UTF-8
 __EOF__
+    echo -e "\e[32mconfigure_locale() finished\e[0m";
     /usr/bin/logger 'configure_locale() finished' -t 'Debian-FW-20220213';
 }
 
 configure_bind() {
     /usr/bin/logger 'configure_bind()' -t 'Debian-FW-20220213';
     echo -e "\e[32mconfigure_bind()\e[0m";
-    systemctl stop bind9.service;
+    systemctl stop bind9.service > /dev/null 2>&1
     echo -e "\e[36m-Configure bind options\e[0m";
     cat << __EOF__  > /etc/bind/named.conf.options
 options {
@@ -83,7 +85,7 @@ options {
 __EOF__
 
     # Generate rndc key
-    rndc-confgen -a -c /etc/bind/rndc.key;    
+    rndc-confgen -a -c /etc/bind/rndc.key > /dev/null 2>&1
     # "local" BIND9 configuration details
     echo -e "\e[36m-Configure bind local\e[0m";
     cat << __EOF__  > /etc/bind/named.conf.local
@@ -186,10 +188,10 @@ __EOF__
 __EOF__
 
 # BIND logging
-    mkdir /var/log/named/
-    touch /varlog/named/bind.log
-    touch /varlog/named/rpz.log
-    chown -R bind:bind /var/log/named/
+    mkdir /var/log/named/ > /dev/null 2>&1
+    touch /var/log/named/bind.log > /dev/null 2>&1
+    touch /var/log/named/rpz.log > /dev/null 2>&1
+    chown -R bind:bind /var/log/named/ > /dev/null 2>&1
     # "local" BIND9 configuration details
     echo -e "\e[36m-Configure bind local\e[0m";
     cat << __EOF__  > /etc/bind/named.conf.log
@@ -218,7 +220,7 @@ logging {
   category rpz { rpzlog; };
 };
 __EOF__
-    echo 'include "/etc/bind/named.conf.log";' | tee -a /etc/bin/named.conf;
+    echo 'include "/etc/bind/named.conf.log";' | tee -a /etc/bin/named.conf > /dev/null 2>&1
     # 20.168.192.in-addr.arpa
     cat << __EOF__  > /var/lib/bind/db.20.168.192.in-addr.arpa
 \$ORIGIN .
@@ -261,12 +263,14 @@ __EOF__
 			NS	$FIREWALL_NAME.
 __EOF__
     sync;
-    systemctl restart bind9.service;
+    systemctl restart bind9.service > /dev/null 2>&1
+    echo -e "\e[32mconfigure_bind() finished\e[0m";
     /usr/bin/logger 'configure_bind() finished' -t 'Debian-FW-20220213';
 }
 
 configure_threatfox() {
     /usr/bin/logger 'configure_threatfox()' -t 'Debian-FW-20220213';
+    echo -e "\e[32mconfigure_threatfox()\e[0m";
     cat << __EOF__  > /lib/systemd/system/update-threatfox.timer
 [Unit]
 Description=Weekly job to update the threatfox RPZ db
@@ -300,12 +304,13 @@ WorkingDirectory=/var/lib/bind/
 [Install]
 WantedBy=multi-user.target
 __EOF__
-    systemctl daemon-reload;
-    systemctl enable update-threatfox.timer;
-    systemctl enable update-threatfox.service;
-    systemctl daemon-reload;
-    systemctl start update-threatfox.timer;
-    systemctl start update-threatfox.service;
+    systemctl daemon-reload > /dev/null 2>&1
+    systemctl enable update-threatfox.timer > /dev/null 2>&1
+    systemctl enable update-threatfox.service > /dev/null 2>&1
+    systemctl daemon-reload > /dev/null 2>&1
+    systemctl start update-threatfox.timer > /dev/null 2>&1
+    systemctl start update-threatfox.service > /dev/null 2>&1
+    echo -e "\e[32mconfigure_threatfox() finished\e[0m";
     /usr/bin/logger 'configure_threatfox() finished' -t 'Debian-FW-20220213';
 }
 
@@ -313,7 +318,7 @@ configure_dhcp_server() {
     /usr/bin/logger 'configure_dhcp_server()' -t 'Debian-FW-20220213';
     echo -e "\e[32mconfigure_dhcp_server()\e[0m";
     # Bind generates key at install, use that or generate new in same location
-    systemctl stop isc-dhcp.server.service;
+    systemctl stop isc-dhcp.server.service > /dev/null 2>&1
     echo -e "\e[36m-Configure dhcpd.conf\e[0m";
     cat << __EOF__  > /etc/dhcp/dhcpd.conf
 # DHCP configuration file
@@ -401,20 +406,22 @@ subnet 192.168.40.0 netmask 255.255.255.0 {
 #}
 __EOF__
     sync;
-    systemctl restart isc-dhcp.server.service;
-    /usr/bin/logger 'configure_dhcp_server()' -t 'Debian-FW-20220213';
+    systemctl restart isc-dhcp.server.service > /dev/null 2>&1
+    echo -e "\e[32mconfigure_dhcp_server()\e[0m";
+    /usr/bin/logger 'configure_dhcp_server() finished' -t 'Debian-FW-20220213';
 }
 
 install_dshield() {
     /usr/bin/logger 'install_dshield()' -t 'Debian-FW-20220213';
     echo -e "\e[32minstall_dshield()\e[0m";
-    mkdir /usr/local/dshield;
-    cd /usr/local/dshield;
-    wget -O /usr/local/dshield https://isc.sans.edu/clients/framework/iptables.tar.gz
-    tar zxvfp iptables.tar.gz;
-    mv iptables ./;
-    rm iptables.tar.gz;
-    cd ~;
+    mkdir /usr/local/dshield > /dev/null 2>&1
+    cd /usr/local/dshield > /dev/null 2>&1
+    wget -O /usr/local/dshield https://isc.sans.edu/clients/framework/iptables.tar.gz > /dev/null 2>&1
+    tar zxvfp iptables.tar.gz > /dev/null 2>&1
+    mv iptables ./ > /dev/null 2>&1
+    rm iptables.tar.gz > /dev/null 2>&1
+    cd ~; > /dev/null 2>&1
+    echo -e "\e[32minstall_dshield() finished\e[0m";
     /usr/bin/logger 'install_dshield() finished' -t 'Debian-FW-20220213';
 }
 
@@ -437,43 +444,49 @@ exit 0
 __EOF__
     sync;
     chmod +x /etc/cron.hourly/dshield;
+    echo -e "\e[32mconfigure_dshield() finished\e[0m";
     /usr/bin/logger 'configure_dshield() finished' -t 'Debian-FW-20220213';
 }
 
 install_crowdsec() {
     /usr/bin/logger 'install_crowdsec()' -t 'Debian-FW-20220213';
+    echo -e "\e[32minstall_crowdsec()\e[0m";
     # Add repo
-    curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash;
+    curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash  > /dev/null 2>&1
     #install crowdsec core daemon
-    apt-get -qq -y install crowdsec;
+    apt-get -qq -y install crowdsec > /dev/null 2>&1
     # install firewall bouncer
-    apt-get -qq -y install crowdsec-firewall-bouncer-iptables;
+    apt-get -qq -y install crowdsec-firewall-bouncer-iptables > /dev/null 2>&1
+    echo -e "\e[32minstall_crowdsec() finished\e[0m";
     /usr/bin/logger 'install_crowdsec() finished' -t 'Debian-FW-20220213';
 }
 
 configure_crowdsec() {
     /usr/bin/logger 'configure_crowdsec()' -t 'Debian-FW-20220213';
+    echo -e "\e[32mconfigure_crowdsec()\e[0m";
     # Collection iptables
-    cscli parsers install crowdsecurity/iptables-logs;
-    cscli parsers install crowdsecurity/geoip-enrich;
-    cscli scenarios install crowdsecurity/iptables-scan-multi_ports;
-    cscli scenarios install crowdsecurity/ssh-bf;
-    cscli collections install crowdsecurity/linux;
-    cscli collections install crowdsecurity/iptables;
-    cscli postoverflows install crowdsecurity/rdns;
+    cscli parsers install crowdsecurity/iptables-logs > /dev/null 2>&1
+    cscli parsers install crowdsecurity/geoip-enrich > /dev/null 2>&1
+    cscli scenarios install crowdsecurity/iptables-scan-multi_ports > /dev/null 2>&1
+    cscli scenarios install crowdsecurity/ssh-bf > /dev/null 2>&1
+    cscli collections install crowdsecurity/linux > /dev/null 2>&1
+    cscli collections install crowdsecurity/iptables > /dev/null 2>&1
+    cscli postoverflows install crowdsecurity/rdns > /dev/null 2>&1
     # configure crowdsec to read iptables.log, specific to this firewall build, or it won't pick up log data
     # add - /var/log/iptables.log after the first filenames:
-    sed -ie '/filenames:/a \  - /var/log/iptables.log' /etc/crowdsec/acquis.yaml;
+    sed -ie '/filenames:/a \  - /var/log/iptables.log' /etc/crowdsec/acquis.yaml > /dev/null 2>&1
     # Running 'sudo systemctl reload crowdsec' for the new configuration to be effective.
-    systemctl reload crowdsec.service;
+    systemctl reload crowdsec.service > /dev/null 2>&1
     # Enable auto complete for BASH
-    source /etc/profile;
-    source <(cscli completion bash);
+    source /etc/profile > /dev/null 2>&1
+    source <(cscli completion bash) > /dev/null 2>&1
+    echo -e "\e[32mconfigure_crowdsec() finished\e[0m";
     /usr/bin/logger 'configure_crowdsec() finished' -t 'Debian-FW-20220213';
 }
 
 configure_rsyslog() {
     /usr/bin/logger 'configure_rsyslog()' -t 'Debian-FW-20220213';
+    echo -e "\e[32mconfigure_rsyslog()\e[0m";
     # Writing iptables logdata to separate file
     echo -e "\e[36m-Configure syslog to filebeat\e[0m";
     cat << __EOF__  > /etc/rsyslog.d/30-iptables.conf
@@ -487,7 +500,8 @@ __EOF__
 & stop
 __EOF__
     sync;
-    systemctl restart rsyslog.service;
+    systemctl restart rsyslog.service > /dev/null 2>&1
+    echo -e "\e[32mconfigure_rsyslog() finished\e[0m";
     /usr/bin/logger 'configure_rsyslog() finished' -t 'Debian-FW-20220213';
 }
 
@@ -527,26 +541,30 @@ __EOF__
 root: $MAIL_ADDRESS
 __EOF__
     # Time to reconfigure exim4
-    dpkg-reconfigure -fnoninteractive exim4-config;
+    dpkg-reconfigure -fnoninteractive exim4-config > /dev/null 2>&1
+    echo -e "\e[32mconfigure_exim() finished\e[0m";
     /usr/bin/logger 'configure_exim() finished' -t 'Debian-FW-20220213';
 }
 
 install_filebeat() {
     /usr/bin/logger 'install_filebeat()' -t 'Debian-FW-20220213';
+    echo -e "\e[32minstall_filebeat()\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
     # Install key and apt source for elastic
-    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -  > /dev/null 2>&1
     #apt-key adv --fetch-keys https://artifacts.elastic.co/GPG-KEY-elasticsearch;
-    echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list;
-    apt-get update;
-    apt-get -qq -y install filebeat;
-    systemctl daemon-reload;
-    systemctl enable filebeat.service;
+    echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-7.x.list > /dev/null 2>&1
+    apt-get update > /dev/null 2>&1
+    apt-get -qq -y install filebeat > /dev/null 2>&1
+    systemctl daemon-reload > /dev/null 2>&1
+    systemctl enable filebeat.service > /dev/null 2>&1
+    echo -e "\e[32minstall_filebeat() finished\e[0m";
     /usr/bin/logger 'install_filebeat() finished' -t 'Debian-FW-20220213';
 }
 
 configure_filebeat() {
     /usr/bin/logger 'configure_filebeat()' -t 'Debian-FW-20220213';
+    echo -e "\e[32mconfigure_filebeat()\e[0m";
     echo -e "\e[32mconfigure rsyslog forwarding to filebeat\e[0m";
     # Forward all logs to Filebeat listening locally on 9001
     echo -e "\e[36m-Configure syslog to filebeat\e[0m";
@@ -554,11 +572,12 @@ configure_filebeat() {
 if \$msg contains "iptables:" then
 *.* @127.0.0.1:9001
 __EOF__
-    systemctl restart rsyslog.service;
+    systemctl restart rsyslog.service > /dev/null 2>&1
     echo -e "\e[32mconfigure_filebeat()\e[0m";
     echo -e "\e[36m-configure Logstash server for Filebeat\e[0m";
     # Depends on your individual setup, follow Elastic guidance and change as required in iptables.rules
-    systemctl start filebeat.service;
+    systemctl start filebeat.service > /dev/null 2>&1
+    echo -e "\e[32mconfigure_filebeat() finished\e[0m";
     /usr/bin/logger 'configure_filebeat() finished' -t 'Debian-FW-20220213';
 }
 
@@ -568,9 +587,10 @@ configure_timezone() {
     echo -e "\e[36m-Set timezone to Etc/UTC\e[0m";
     # Setting timezone to UTC
     export DEBIAN_FRONTEND=noninteractive;
-    rm /etc/localtime
+    rm /etc/localtime > /dev/null 2>&1
     sh -c "echo 'Etc/UTC' > /etc/timezone";
-    dpkg-reconfigure -f noninteractive tzdata;
+    dpkg-reconfigure -f noninteractive tzdata > /dev/null 2>&1
+    echo -e "\e[32mconfigure_timezone() finished\e[0m";
     /usr/bin/logger 'configure_timezone() finished' -t 'Debian-FW-20220213';
 }
 
@@ -652,12 +672,12 @@ __EOF__
   endscript
 }
 __EOF__
+    echo -e "\e[32mconfigure_logrotate() finished\e[0m";
     /usr/bin/logger 'configure_logrotate() finished' -t 'Debian-FW-20220213';
 }
 
 install_prerequisites() {
     /usr/bin/logger 'install_prerequisites' -t 'Debian-FW-20220213';
-    echo -e "\e[1;32m--------------------------------------------\e[0m";
     echo -e "\e[1;32mInstalling Prerequisite packages\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
     # OS Version
@@ -669,17 +689,18 @@ install_prerequisites() {
     echo -e "\e[1;32mOperating System: $OS Version: $VER\e[0m";
     # Install prerequisites
     echo -e "\e[36m-prerequisites...\e[0m";
-    apt-get -qq -y install net-tools libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4 sysfsutils iptables vnstat iftop;
+    apt-get -qq -y install net-tools libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4 sysfsutils iptables vnstat iftop > /dev/null 2>&1
     # Install some basic tools on a Debian net install
     /usr/bin/logger '..Install some basic tools on a Debian net install' -t 'Debian-FW-20220213';
-    apt-get -qq -y install sudo adduser wget whois unzip apt-transport-https ca-certificates curl gnupg2 software-properties-common dnsutils;
-    apt-get -qq -y install bash-completion debian-goodies dirmngr ethtool firmware-iwlwifi firmware-linux-free firmware-linux-nonfree;
-    apt-get -qq -y install sudo flashrom geoip-database unattended-upgrades python3 python3-pip;
+    apt-get -qq -y install sudo adduser wget whois unzip apt-transport-https ca-certificates curl gnupg2 software-properties-common dnsutils > /dev/null 2>&1
+    apt-get -qq -y install bash-completion debian-goodies dirmngr ethtool firmware-iwlwifi firmware-linux-free firmware-linux-nonfree > /dev/null 2>&1
+    apt-get -qq -y install sudo flashrom geoip-database unattended-upgrades python3 python3-pip > /dev/null 2>&1
     python3 -m pip install --upgrade pip;
     # Set correct locale
-    systemctl daemon-reload;
-    systemctl enable bind9.service;
-    systemctl enable isc-dhcp-server.service;
+    systemctl daemon-reload > /dev/null 2>&1
+    systemctl enable bind9.service > /dev/null 2>&1
+    systemctl enable isc-dhcp-server.service > /dev/null 2>&1
+    echo -e "\e[1;32mInstalling Prerequisite packages finished\e[0m";
     /usr/bin/logger 'install_prerequisites() finished' -t 'Debian-FW-20220213';
 }
 
@@ -695,6 +716,7 @@ devices/system/cpu/cpu2/cpufreq/scaling_governor = performance
 devices/system/cpu/cpu3/cpufreq/scaling_governor = performance
 __EOF__
     sync;
+    echo -e "\e[32mconfigure_cpu() finished\e[0m";
     /usr/bin/logger 'configure_cpu() finished' -t 'Debian-FW-20220213';
 }
 
@@ -706,6 +728,7 @@ enable_ipforwarding() {
     # The current ruleset is IPv4 only, so do NOT enable Ipv6 forwarding just yet
     #/usr/bin/sed -ie s/#net.ipv6.conf.all.forwarding=1/net.ipv6.conf.all.forwarding=1/g /etc/sysctl.conf
     sync;
+    echo -e "\e[32menable_ipforwarding() finished\e[0m";
     /usr/bin/logger 'enable_ipforwarding() finished' -t 'Debian-FW-20220213';
 }
 
@@ -713,7 +736,7 @@ configure_resolv() {
     /usr/bin/logger 'configure_resolv()' -t 'Debian-FW-20220213';    
     echo -e "\e[32mconfigure_resolv()\e[0m";
     echo -e "\e[36m-Configuring resolv.conf\e[0m";
-    mv /etc/resolv.conf /etc/resolv.conf.isp;
+    mv /etc/resolv.conf /etc/resolv.conf.isp > /dev/null 2>&1
     # DHCP changes your resolv.conf to use the ISPs dns and search order, so let's make sure we always use local BIND9
     cat << __EOF__  > /etc/resolv.conf
 domain $INTERNAL_DOMAIN
@@ -723,7 +746,8 @@ nameserver 127.0.0.1
 __EOF__
     sync;
     # Make it immutable or these changes will be overwritten everytime dhcp lease renews
-    /usr/bin/chattr +i /etc/resolv.conf;
+    /usr/bin/chattr +i /etc/resolv.conf > /dev/null 2>&1
+    echo -e "\e[32mconfigure_resolv() finished\e[0m";
     /usr/bin/logger 'configure_resolv() finished' -t 'Debian-FW-20220213';    
 }
 
@@ -731,7 +755,7 @@ install_updates() {
     echo -e "\e[32m - install_updates()\e[0m";
     /usr/bin/logger 'install_updates()' -t 'Debian-FW-20220213';
     export DEBIAN_FRONTEND=noninteractive;
-    apt-get -qq -y install --fix-policy;
+    apt-get -qq -y install --fix-policy > /dev/null 2>&1
     echo -e "\e[36m ... update\e[0m" && apt-get -qq update > /dev/null 2>&1
     echo -e "\e[36m ... full-upgrade\e[0m" && apt-get -qq -y full-upgrade > /dev/null 2>&1
     echo -e "\e[36m ... cleaning up apt\e[0m";
@@ -748,7 +772,7 @@ install_ntp_tools() {
     /usr/bin/logger 'install_ntp_tools()' -t 'Debian-FW-20220213';
     export DEBIAN_FRONTEND=noninteractive;
     echo -e "\e[36m ... installing ntp tools\e[0m";
-    apt-get -qq -y install ntpstat ntpdate > /dev/null 2>&1;
+    apt-get -qq -y install ntpstat ntpdate > /dev/null 2>&1
     echo -e "\e[32m - install_ntp_tools() finished\e[0m";
     /usr/bin/logger 'install_ntp_tools() finished' -t 'Debian-FW-20220213';
 }
@@ -758,7 +782,7 @@ install_ntp() {
     echo -e "\e[32m - install_ntp()\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
     echo -e "\e[36m ... installing ntp\e[0m";
-    apt-get -qq -y install ntp > /dev/null 2>&1;
+    apt-get -qq -y install ntp > /dev/null 2>&1
     /usr/bin/logger 'install_ntp() finished' -t 'Debian-FW-20220213';
     echo -e "\e[32m - install_ntp() finished\e[0m";
 }
@@ -1279,7 +1303,7 @@ configure_grubserial() {
 configure_hostapd() {
     /usr/bin/logger 'configure_hostapd()' -t 'Debian-FW-20220213'
     # Install hostapd
-    apt-get -qq -y install hostapd;
+    apt-get -qq -y install hostapd > /dev/null 2>&1
     # Create hostapd config file
     cat << __EOF__  >  /etc/hostapd/hostapd.conf
 interface=wlp5s0
@@ -1313,14 +1337,14 @@ __EOF__
 install_alerta() {
     /usr/bin/logger 'install_alerta()' -t 'Debian-FW-20220213'
     export DEBIAN_FRONTEND=noninteractive;
-    apt-get -qq -y install python3-pip python3-venv;
-    id alerta || (groupadd alerta && useradd -g alerta alerta);
-    cd /opt;
-    python3 -m venv alerta;
-    /opt/alerta/bin/pip install --upgrade pip wheel;
-    /opt/alerta/bin/pip install alerta;
-    mkdir /home/alerta/;
-    chown -R alerta:alerta /home/alerta;
+    apt-get -qq -y install python3-pip python3-venv > /dev/null 2>&1
+    id alerta || (groupadd alerta && useradd -g alerta alerta) > /dev/null 2>&1
+    cd /opt > /dev/null 2>&1
+    python3 -m venv alerta > /dev/null 2>&1
+    /opt/alerta/bin/pip install --upgrade pip wheel > /dev/null 2>&1
+    /opt/alerta/bin/pip install alerta > /dev/null 2>&1
+    mkdir /home/alerta/ > /dev/null 2>&1
+    chown -R alerta:alerta /home/alerta > /dev/null 2>&1
     /usr/bin/logger 'install_alerta() finished' -t 'Debian-FW-20220213'
 }
 
@@ -1369,11 +1393,11 @@ Unit=alerta-heartbeat.service
 [Install]
 WantedBy=multi-user.target
 __EOF__
-    systemctl daemon-reload;
-    systemctl enable alerta-heartbeat.timer;
-    systemctl enable alerta-heartbeat.service;
-    systemctl start alerta-heartbeat.timer;
-    systemctl start alerta-heartbeat.service;
+    systemctl daemon-reload > /dev/null 2>&1
+    systemctl enable alerta-heartbeat.timer > /dev/null 2>&1
+    systemctl enable alerta-heartbeat.service > /dev/null 2>&1
+    systemctl start alerta-heartbeat.timer > /dev/null 2>&1
+    systemctl start alerta-heartbeat.service > /dev/null 2>&1
     echo "configure_alerta_heartbeat() finished";
     /usr/bin/logger 'configure_alerta_heartbeat() finished' -t 'Debian-FW-20220213'
 }
