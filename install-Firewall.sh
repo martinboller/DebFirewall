@@ -731,7 +731,7 @@ install_updates() {
     echo -e "\e[32m - install_updates()\e[0m";
     /usr/bin/logger 'install_updates()' -t 'Debian-FW-20220213';
     export DEBIAN_FRONTEND=noninteractive;
-    sync
+    apt-get -qq -y install --fix-policy;
     echo -e "\e[36m ... update\e[0m" && apt-get -qq update > /dev/null 2>&1
     echo -e "\e[36m ... full-upgrade\e[0m" && apt-get -qq -y full-upgrade > /dev/null 2>&1
     echo -e "\e[36m ... cleaning up apt\e[0m";
