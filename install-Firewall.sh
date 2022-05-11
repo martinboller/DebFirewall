@@ -1295,8 +1295,8 @@ finish_reboot() {
 configure_grubserial() {
     /usr/bin/logger 'configure_grubserial()' -t 'Debian-FW-20220213'
     echo -e "\e[32mconfigure_grubserial()\e[0m";
-    echo 'GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8"' | tee -a /etc/default/grub
-    update-grub;
+    echo 'GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8"' | tee -a /etc/default/grub > /dev/null 2>&1
+    update-grub > /dev/null 2>&1
     echo -e "\e[32mconfigure_grubserial()\e[0m";
 }
 
