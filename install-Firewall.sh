@@ -150,6 +150,16 @@ zone "40.168.192.in-addr.arpa" {
         allow-transfer { 192.168.10.1; localhost; };
         file "/var/lib/bind/db.40.168.192.in-addr.arpa";
         };
+
+zone "threatfox.rpz" {
+        type master;
+        file "/var/lib/bind/threatfox.rpz";
+        check-names ignore;
+        allow-update { none; };
+        allow-transfer { 192.168.10.1; localhost; 192.168.10.193; };
+        allow-query { localhost; };
+};
+
 __EOF__
 
     echo -e "\e[36m-Configure forward lookup zone\e[0m";
