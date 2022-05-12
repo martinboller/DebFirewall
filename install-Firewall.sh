@@ -79,7 +79,7 @@ options {
     empty-zones-enable yes;
     response-policy {
 		#zone "rpz.block.misp";
-		#zone "threatfox.rpz";
+		zone "threatfox.rpz";
     };
 };
 __EOF__
@@ -288,7 +288,7 @@ Unit=update-threatfox.service
 WantedBy=multi-user.target
 __EOF__
 
-    cat << __EOF__  > /lib/systemd/system/update-threatfox.timer
+    cat << __EOF__  > /lib/systemd/system/update-threatfox.service
 [Unit]
 Description=service file downloading latest rpz from threatfox
 Documentation=https://threatfox.abuse.ch/export/#rpz
@@ -405,6 +405,9 @@ subnet 192.168.40.0 netmask 255.255.255.0 {
 #       fixed-address 192.168.10.25;
 #}
 __EOF__
+    # Configure interfaces to listen on + disable dhcpv6
+    sed -ie 's/INTERFACESv4=\"\"/INTERFACESv4=\"enp2s0 enp3s0 enp4s0\"/g' /etc/default/isc-dhcp-server > /dev/null 2>&1
+    sed -ie 's/INTERFACESv6=\"\"/#INTERFACESv6=\"\"/g' /etc/default/isc-dhcp-server > /dev/null 2>&1
     sync;
     systemctl restart isc-dhcp.server.service > /dev/null 2>&1
     echo -e "\e[32mconfigure_dhcp_server()\e[0m";
