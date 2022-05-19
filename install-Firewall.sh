@@ -5,10 +5,11 @@
 # Author:       Martin Boller                                       #
 #                                                                   #
 # Email:        martin@bollers.dk                                   #
-# Last Update:  2022-05-09                                          #
-# Version:      2.10                                                #
+# Last Update:  2022-05-19                                          #
+# Version:      2.20                                                #
 #                                                                   #
-# Changes:      Tested on APU4D4 (2.10)                             #
+# Changes:      dhclient cleanup (2.20)                             #
+#               Tested on APU4D4 (2.10)                             #
 #               Crowdsec implementation (2.00)                      #
 #               Sysfsutils/performance CPU governor (1.30)          #
 #               IP forwarding routine (1.20)                        #
@@ -18,7 +19,7 @@
 #####################################################################
 
 get_information() {
-    /usr/bin/logger 'get_information()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'get_information()' -t 'Debian-FW-20220519';
     echo -e "\e[32mget_information()\e[0m";
     read -p "FQDN of outgoing mailserver: " MAIL_SERVER;
     read -p "Port for outgoing mailserver: " MAIL_SERVER_PORT;
@@ -37,11 +38,11 @@ get_information() {
     # Set FQDN
     hostnamectl set-hostname $FIREWALL_NAME.$INTERNAL_DOMAIN;
     echo -e "\e[32mget_information() finished\e[0m";
-    /usr/bin/logger 'get_information() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'get_information() finished' -t 'Debian-FW-20220519';
 }
 
 configure_locale() {
-    /usr/bin/logger 'configure_locale()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_locale()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_locale()\e[0m";
     echo -e "\e[36m-Configure locale (default:C.UTF-8)\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
@@ -53,11 +54,11 @@ LANGUAGE=C.UTF-8
 LC_ALL=C.UTF-8
 __EOF__
     echo -e "\e[32mconfigure_locale() finished\e[0m";
-    /usr/bin/logger 'configure_locale() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_locale() finished' -t 'Debian-FW-20220519';
 }
 
 configure_bind() {
-    /usr/bin/logger 'configure_bind()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_bind()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_bind()\e[0m";
     systemctl stop bind9.service > /dev/null 2>&1
     echo -e "\e[36m-Configure bind options\e[0m";
@@ -275,11 +276,11 @@ __EOF__
     sync;
     systemctl restart bind9.service > /dev/null 2>&1
     echo -e "\e[32mconfigure_bind() finished\e[0m";
-    /usr/bin/logger 'configure_bind() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_bind() finished' -t 'Debian-FW-20220519';
 }
 
 configure_threatfox() {
-    /usr/bin/logger 'configure_threatfox()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_threatfox()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_threatfox()\e[0m";
     cat << __EOF__  > /lib/systemd/system/update-threatfox.timer
 [Unit]
@@ -321,11 +322,11 @@ __EOF__
     systemctl start update-threatfox.timer > /dev/null 2>&1
     systemctl start update-threatfox.service > /dev/null 2>&1
     echo -e "\e[32mconfigure_threatfox() finished\e[0m";
-    /usr/bin/logger 'configure_threatfox() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_threatfox() finished' -t 'Debian-FW-20220519';
 }
 
 configure_dhcp_server() {
-    /usr/bin/logger 'configure_dhcp_server()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_dhcp_server()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_dhcp_server()\e[0m";
     # Bind generates key at install, use that or generate new in same location
     systemctl stop isc-dhcp.server.service > /dev/null 2>&1
@@ -421,11 +422,11 @@ __EOF__
     sync;
     systemctl restart isc-dhcp.server.service > /dev/null 2>&1
     echo -e "\e[32mconfigure_dhcp_server()\e[0m";
-    /usr/bin/logger 'configure_dhcp_server() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_dhcp_server() finished' -t 'Debian-FW-20220519';
 }
 
 install_dshield() {
-    /usr/bin/logger 'install_dshield()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_dshield()' -t 'Debian-FW-20220519';
     echo -e "\e[32minstall_dshield()\e[0m";
     mkdir /usr/local/dshield > /dev/null 2>&1
     cd /usr/local/dshield > /dev/null 2>&1
@@ -435,11 +436,11 @@ install_dshield() {
     rm iptables.tar.gz > /dev/null 2>&1
     cd ~; > /dev/null 2>&1
     echo -e "\e[32minstall_dshield() finished\e[0m";
-    /usr/bin/logger 'install_dshield() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_dshield() finished' -t 'Debian-FW-20220519';
 }
 
 configure_dshield() {
-    /usr/bin/logger 'configure_dshield()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_dshield()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_dshield()\e[0m";
     # copy default dshield files
     /usr/bin/cp /usr/local/dshield/dshield* /etc/;
@@ -458,11 +459,11 @@ __EOF__
     sync;
     chmod +x /etc/cron.hourly/dshield;
     echo -e "\e[32mconfigure_dshield() finished\e[0m";
-    /usr/bin/logger 'configure_dshield() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_dshield() finished' -t 'Debian-FW-20220519';
 }
 
 install_crowdsec() {
-    /usr/bin/logger 'install_crowdsec()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_crowdsec()' -t 'Debian-FW-20220519';
     echo -e "\e[32minstall_crowdsec()\e[0m";
     # Add repo
     curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | sudo bash  > /dev/null 2>&1
@@ -471,11 +472,11 @@ install_crowdsec() {
     # install firewall bouncer
     apt-get -qq -y install crowdsec-firewall-bouncer-iptables > /dev/null 2>&1
     echo -e "\e[32minstall_crowdsec() finished\e[0m";
-    /usr/bin/logger 'install_crowdsec() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_crowdsec() finished' -t 'Debian-FW-20220519';
 }
 
 configure_crowdsec() {
-    /usr/bin/logger 'configure_crowdsec()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_crowdsec()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_crowdsec()\e[0m";
     # Collection iptables
     cscli parsers install crowdsecurity/iptables-logs > /dev/null 2>&1
@@ -494,11 +495,11 @@ configure_crowdsec() {
     source /etc/profile > /dev/null 2>&1
     source <(cscli completion bash) > /dev/null 2>&1
     echo -e "\e[32mconfigure_crowdsec() finished\e[0m";
-    /usr/bin/logger 'configure_crowdsec() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_crowdsec() finished' -t 'Debian-FW-20220519';
 }
 
 configure_rsyslog() {
-    /usr/bin/logger 'configure_rsyslog()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_rsyslog()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_rsyslog()\e[0m";
     # Writing iptables logdata to separate file
     echo -e "\e[36m-Configure syslog to filebeat\e[0m";
@@ -515,11 +516,11 @@ __EOF__
     sync;
     systemctl restart rsyslog.service > /dev/null 2>&1
     echo -e "\e[32mconfigure_rsyslog() finished\e[0m";
-    /usr/bin/logger 'configure_rsyslog() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_rsyslog() finished' -t 'Debian-FW-20220519';
 }
 
 configure_exim() {
-    /usr/bin/logger 'configure_exim()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_exim()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_exim()\e[0m";
     echo -e "\e[36m-Configure exim4.conf.conf\e[0m";
     cat << __EOF__  > /etc/exim4/update-exim4.conf.conf
@@ -556,11 +557,11 @@ __EOF__
     # Time to reconfigure exim4
     dpkg-reconfigure -fnoninteractive exim4-config > /dev/null 2>&1
     echo -e "\e[32mconfigure_exim() finished\e[0m";
-    /usr/bin/logger 'configure_exim() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_exim() finished' -t 'Debian-FW-20220519';
 }
 
 install_filebeat() {
-    /usr/bin/logger 'install_filebeat()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_filebeat()' -t 'Debian-FW-20220519';
     echo -e "\e[32minstall_filebeat()\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
     # Install key and apt source for elastic
@@ -572,11 +573,11 @@ install_filebeat() {
     systemctl daemon-reload > /dev/null 2>&1
     systemctl enable filebeat.service > /dev/null 2>&1
     echo -e "\e[32minstall_filebeat() finished\e[0m";
-    /usr/bin/logger 'install_filebeat() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_filebeat() finished' -t 'Debian-FW-20220519';
 }
 
 configure_filebeat() {
-    /usr/bin/logger 'configure_filebeat()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_filebeat()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_filebeat()\e[0m";
     echo -e "\e[32mconfigure rsyslog forwarding to filebeat\e[0m";
     # Forward all logs to Filebeat listening locally on 9001
@@ -591,11 +592,11 @@ __EOF__
     # Depends on your individual setup, follow Elastic guidance and change as required in iptables.rules
     systemctl start filebeat.service > /dev/null 2>&1
     echo -e "\e[32mconfigure_filebeat() finished\e[0m";
-    /usr/bin/logger 'configure_filebeat() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_filebeat() finished' -t 'Debian-FW-20220519';
 }
 
 configure_timezone() {
-    /usr/bin/logger 'configure_timezone()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_timezone()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_timezone()\e[0m";
     echo -e "\e[36m-Set timezone to Etc/UTC\e[0m";
     # Setting timezone to UTC
@@ -604,11 +605,11 @@ configure_timezone() {
     sh -c "echo 'Etc/UTC' > /etc/timezone";
     dpkg-reconfigure -f noninteractive tzdata > /dev/null 2>&1
     echo -e "\e[32mconfigure_timezone() finished\e[0m";
-    /usr/bin/logger 'configure_timezone() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_timezone() finished' -t 'Debian-FW-20220519';
 }
 
 configure_sources() {
-    /usr/bin/logger 'configure_sources()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_sources()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_sources()\e[0m";
     echo -e "\e[36m-sources.list\e[0m";
     cat << __EOF__  > /etc/apt/sources.list
@@ -628,7 +629,7 @@ __EOF__
 }
 
 configure_logrotate() {
-    /usr/bin/logger 'configure_logrotate()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_logrotate()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_logrotate()\e[0m";
     echo -e "\e[36m-ntppeers.log\e[0m";
     # configuring logrotation for ntppeers.log
@@ -686,11 +687,11 @@ __EOF__
 }
 __EOF__
     echo -e "\e[32mconfigure_logrotate() finished\e[0m";
-    /usr/bin/logger 'configure_logrotate() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_logrotate() finished' -t 'Debian-FW-20220519';
 }
 
 install_prerequisites() {
-    /usr/bin/logger 'install_prerequisites' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_prerequisites' -t 'Debian-FW-20220519';
     echo -e "\e[1;32mInstalling Prerequisite packages\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
     # OS Version
@@ -698,13 +699,13 @@ install_prerequisites() {
     . /etc/os-release
     OS=$NAME
     VER=$VERSION_ID
-    /usr/bin/logger "Operating System: $OS Version: $VER" -t 'Debian-FW-20220213';
+    /usr/bin/logger "Operating System: $OS Version: $VER" -t 'Debian-FW-20220519';
     echo -e "\e[1;32mOperating System: $OS Version: $VER\e[0m";
     # Install prerequisites
     echo -e "\e[36m-prerequisites...\e[0m";
     apt-get -qq -y install net-tools libio-socket-ssl-perl libnet-ssleay-perl bind9 isc-dhcp-server exim4 sysfsutils iptables vnstat iftop > /dev/null 2>&1
     # Install some basic tools on a Debian net install
-    /usr/bin/logger '..Install some basic tools on a Debian net install' -t 'Debian-FW-20220213';
+    /usr/bin/logger '..Install some basic tools on a Debian net install' -t 'Debian-FW-20220519';
     apt-get -qq -y install sudo adduser wget whois unzip apt-transport-https ca-certificates curl gnupg2 software-properties-common dnsutils > /dev/null 2>&1
     apt-get -qq -y install bash-completion debian-goodies dirmngr ethtool firmware-iwlwifi firmware-linux-free firmware-linux-nonfree > /dev/null 2>&1
     apt-get -qq -y install sudo flashrom geoip-database unattended-upgrades python3 python3-pip > /dev/null 2>&1
@@ -714,11 +715,11 @@ install_prerequisites() {
     systemctl enable bind9.service > /dev/null 2>&1
     systemctl enable isc-dhcp-server.service > /dev/null 2>&1
     echo -e "\e[1;32mInstalling Prerequisite packages finished\e[0m";
-    /usr/bin/logger 'install_prerequisites() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_prerequisites() finished' -t 'Debian-FW-20220519';
 }
 
 configure_cpu() {
-    /usr/bin/logger 'configure_cpu()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_cpu()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_cpu()\e[0m";
     echo -e "\e[36m-CPU performance governor\e[0m";
     cat << __EOF__  >> /etc/sysfs.conf
@@ -730,11 +731,11 @@ devices/system/cpu/cpu3/cpufreq/scaling_governor = performance
 __EOF__
     sync;
     echo -e "\e[32mconfigure_cpu() finished\e[0m";
-    /usr/bin/logger 'configure_cpu() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_cpu() finished' -t 'Debian-FW-20220519';
 }
 
 enable_ipforwarding() {
-    /usr/bin/logger 'enable_ipforwarding()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'enable_ipforwarding()' -t 'Debian-FW-20220519';
     echo -e "\e[32menable_ipforwarding()\e[0m";
     echo -e "\e[36m-Enabling IPv4 Forwarding\e[0m";
     /usr/bin/sed -ie s/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g /etc/sysctl.conf
@@ -742,11 +743,11 @@ enable_ipforwarding() {
     #/usr/bin/sed -ie s/#net.ipv6.conf.all.forwarding=1/net.ipv6.conf.all.forwarding=1/g /etc/sysctl.conf
     sync;
     echo -e "\e[32menable_ipforwarding() finished\e[0m";
-    /usr/bin/logger 'enable_ipforwarding() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'enable_ipforwarding() finished' -t 'Debian-FW-20220519';
 }
 
 configure_resolv() {
-    /usr/bin/logger 'configure_resolv()' -t 'Debian-FW-20220213';    
+    /usr/bin/logger 'configure_resolv()' -t 'Debian-FW-20220519';    
     echo -e "\e[32mconfigure_resolv()\e[0m";
     echo -e "\e[36m-Configuring resolv.conf\e[0m";
     mv /etc/resolv.conf /etc/resolv.conf.isp > /dev/null 2>&1
@@ -761,12 +762,12 @@ __EOF__
     # Make it immutable or these changes will be overwritten everytime dhcp lease renews
     /usr/bin/chattr +i /etc/resolv.conf > /dev/null 2>&1
     echo -e "\e[32mconfigure_resolv() finished\e[0m";
-    /usr/bin/logger 'configure_resolv() finished' -t 'Debian-FW-20220213';    
+    /usr/bin/logger 'configure_resolv() finished' -t 'Debian-FW-20220519';    
 }
 
 install_updates() {
     echo -e "\e[32m - install_updates()\e[0m";
-    /usr/bin/logger 'install_updates()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_updates()' -t 'Debian-FW-20220519';
     export DEBIAN_FRONTEND=noninteractive;
     apt-get -qq -y install --fix-policy > /dev/null 2>&1
     echo -e "\e[36m ... update\e[0m" && apt-get -qq update > /dev/null 2>&1
@@ -777,31 +778,31 @@ install_updates() {
     echo -e "\e[36m ... Done\e[0m" > /dev/null 2>&1
     sync;
     echo -e "\e[32m - install_updates() finished\e[0m";
-    /usr/bin/logger 'install_updates() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_updates() finished' -t 'Debian-FW-20220519';
 }
 
 install_ntp_tools() {
     echo -e "\e[32m - install_ntp_tools()\e[0m";
-    /usr/bin/logger 'install_ntp_tools()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_ntp_tools()' -t 'Debian-FW-20220519';
     export DEBIAN_FRONTEND=noninteractive;
     echo -e "\e[36m ... installing ntp tools\e[0m";
     apt-get -qq -y install ntpstat ntpdate > /dev/null 2>&1
     echo -e "\e[32m - install_ntp_tools() finished\e[0m";
-    /usr/bin/logger 'install_ntp_tools() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_ntp_tools() finished' -t 'Debian-FW-20220519';
 }
 
 install_ntp() {
-    /usr/bin/logger 'install_ntp()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_ntp()' -t 'Debian-FW-20220519';
     echo -e "\e[32m - install_ntp()\e[0m";
     export DEBIAN_FRONTEND=noninteractive;
     echo -e "\e[36m ... installing ntp\e[0m";
     apt-get -qq -y install ntp > /dev/null 2>&1
-    /usr/bin/logger 'install_ntp() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_ntp() finished' -t 'Debian-FW-20220519';
     echo -e "\e[32m - install_ntp() finished\e[0m";
 }
 
 configure_ntp() {
-    /usr/bin/logger 'configure_ntp()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_ntp()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_ntp()\e[0m";
     echo -e "\e[36m-Stop ntpd\e[0m";
     systemctl stop ntp.service;
@@ -875,11 +876,11 @@ __EOF__
     sync;    
     ## Restart NTPD
     systemctl restart ntp.service;
-    /usr/bin/logger 'configure_ntp() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_ntp() finished' -t 'Debian-FW-20220519';
 }
 
 configure_update-leap() {
-    /usr/bin/logger 'configure_update-leap()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_update-leap()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_update-leap()\e[0m";
     echo -e "\e[36m-Creating service unit file\e[0m";
     cat << __EOF__  > /lib/systemd/system/update-leap.service
@@ -930,11 +931,11 @@ __EOF__
     systemctl daemon-reload;
     systemctl start update-leap.timer;
     systemctl start update-leap.service;
-    /usr/bin/logger 'configure_update-leap() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_update-leap() finished' -t 'Debian-FW-20220519';
 }
 
 configure_iptables() {
-    /usr/bin/logger 'configure_iptables()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_iptables()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_iptables()\e[0m";
     echo -e "\e[32m-Creating iptables rules file\e[0m";
     cat << __EOF__  >> /etc/network/iptables.rules
@@ -1147,11 +1148,11 @@ __EOF__
     ## make the scripts executable
     chmod +x /etc/network/if-pre-up.d/firewallrules;
     chmod +x /etc/network/if-up.d/blacholerfc1918;
-    /usr/bin/logger 'configure_iptables() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_iptables() finished' -t 'Debian-FW-20220519';
 }
 
 configure_interfaces() {
-    /usr/bin/logger 'configure_interfaces()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_interfaces()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_interfaces()\e[0m";
     echo -e "\e[36m-Create interfaces file\e[0m";
     ## Important this will overwrite your current interfaces file and may mess with all your networking on this system
@@ -1207,7 +1208,7 @@ iface wlp5s0 inet static
   netmask 255.255.255.0
   dns-nameservers 192.168.40.1
 __EOF__
-    /usr/bin/logger 'configure_interfaces() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_interfaces() finished' -t 'Debian-FW-20220519';
 }
 
 configure_motd() {
@@ -1232,11 +1233,11 @@ __EOF__
     # do not show motd twice
     sed -ie 's/session    optional     pam_motd.so  motd=\/etc\/motd/#session    optional     pam_motd.so  motd=\/etc\/motd/' /etc/pam.d/sshd
     sync;
-    /usr/bin/logger 'configure_motd() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_motd() finished' -t 'Debian-FW-20220519';
 }
 
 install_ssh_keys() {
-    /usr/bin/logger 'install_ssh_keys()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_ssh_keys()' -t 'Debian-FW-20220519';
     echo -e "\e[32minstall_ssh_keys()\e[0m";
     echo -e "\e[36m-Add public key to authorized_keys file\e[0m";
     # Echo add SSH public key for root logon - change this to your own key
@@ -1245,31 +1246,50 @@ install_ssh_keys() {
     chmod 700 /root/.ssh
     chmod 600 /root/.ssh/authorized_keys
     sync;
-    /usr/bin/logger 'install_SSH_PUBLIC_KEYs() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'install_SSH_PUBLIC_KEYs() finished' -t 'Debian-FW-20220519';
 }
 
 configure_sshd() {
-    /usr/bin/logger 'configure_sshd()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_sshd()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_sshd()\e[0m";
     ## Generate new host keys
     echo -e "\e[36m-Delete and recreate host SSH keys\e[0m";
     rm -v /etc/ssh/ssh_host_*;
     dpkg-reconfigure openssh-server;
     sync;
-    /usr/bin/logger 'configure_sshd() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_sshd() finished' -t 'Debian-FW-20220519';
 }
 
 disable_timesyncd() {
-    /usr/bin/logger 'disable_timesyncd()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'disable_timesyncd()' -t 'Debian-FW-20220519';
     echo -e "\e[32mDisable_timesyncd()\e[0m";
     systemctl stop systemd-timesyncd
     systemctl daemon-reload
     systemctl disable systemd-timesyncd
-    /usr/bin/logger 'disable_timesyncd() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'disable_timesyncd() finished' -t 'Debian-FW-20220519';
+}
+
+configure_dhclient_cleanup() {
+    /usr/bin/logger 'configure_dhclient_cleanup()' -t 'Debian-FW-20220519';
+    echo -e "\e[32mDisable_timesyncd()\e[0m";
+    # Create cron job for cleaning up old resolv.conf.dhclient-new* files created by dhclient
+    # This is needed as resolv.conf is made immutable, hence dhclient can't overwrite it and thus
+    # leaves a lot of ...dhclient-new files in /etc/ 
+    cat << __EOF__  >  /etc/cron.hourly/dhclient
+#!/bin/bash
+
+rm /etc/resolv.conf.dhclient-new.*
+/usr/bin/logger 'Removed old resolv.conf.dhclient-new files' -t 'firewall';
+exit 0
+__EOF__
+    chmod 755 /etc/cron.hourly/dhclient;
+    /usr/bin/logger 'configure_dhclient_cleanup() finished' -t 'Debian-FW-20220519';
+    echo -e "\e[32mconfigure_dhclient_cleanup()\e[0m";
+
 }
 
 configure_dhcp_ntp() {
-    /usr/bin/logger 'configure_dhcp_ntp()' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_dhcp_ntp()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_dhcp_ntp()\e[0m";
     ## Remove ntp and timesyncd exit hooks to cater for server using DHCP
     echo -e "\e[36m-Remove scripts utilizing DHCP\e[0m";
@@ -1283,12 +1303,12 @@ configure_dhcp_ntp() {
     sed -i -e "s/option ntp_servers/#option ntp_servers/" /etc/dhcpcd.conf;
     ## restart NTPD yet again after cleaning up DHCP
     systemctl restart ntp
-    /usr/bin/logger 'configure_dhcp_ntp() finished' -t 'Debian-FW-20220213';
+    /usr/bin/logger 'configure_dhcp_ntp() finished' -t 'Debian-FW-20220519';
 }
 
 finish_reboot() {
     echo -e "\e[1;31m - Countdown to reboot!\e[0m";
-    /usr/bin/logger 'Countdown to reboot!' -t 'Debian-FW-20220213'
+    /usr/bin/logger 'Countdown to reboot!' -t 'Debian-FW-20220519'
     secs=30;
     echo -e;
     echo -e "\e[1;31m--------------------------------------------\e[0m";
@@ -1301,12 +1321,12 @@ finish_reboot() {
     sync;
     echo -e
     echo -e "\e[1;31m - REBOOTING!\e[0m";
-    /usr/bin/logger 'Rebooting!!' -t 'Debian-FW-20220213'
+    /usr/bin/logger 'Rebooting!!' -t 'Debian-FW-20220519'
     reboot;
 }
 
 configure_grubserial() {
-    /usr/bin/logger 'configure_grubserial()' -t 'Debian-FW-20220213'
+    /usr/bin/logger 'configure_grubserial()' -t 'Debian-FW-20220519'
     echo -e "\e[32mconfigure_grubserial()\e[0m";
     echo 'GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8"' | tee -a /etc/default/grub > /dev/null 2>&1
     update-grub > /dev/null 2>&1
@@ -1314,7 +1334,7 @@ configure_grubserial() {
 }
 
 configure_hostapd() {
-    /usr/bin/logger 'configure_hostapd()' -t 'Debian-FW-20220213'
+    /usr/bin/logger 'configure_hostapd()' -t 'Debian-FW-20220519'
     # Install hostapd
     apt-get -qq -y install hostapd > /dev/null 2>&1
     # Create hostapd config file
@@ -1344,11 +1364,11 @@ logger_syslog_level=2
 logger_stdout=127
 logger_stdout_level=2
 __EOF__
-    /usr/bin/logger 'configure_hostapd()' -t 'Debian-FW-20220213'
+    /usr/bin/logger 'configure_hostapd()' -t 'Debian-FW-20220519'
 }
 
 install_alerta() {
-    /usr/bin/logger 'install_alerta()' -t 'Debian-FW-20220213'
+    /usr/bin/logger 'install_alerta()' -t 'Debian-FW-20220519'
     export DEBIAN_FRONTEND=noninteractive;
     apt-get -qq -y install python3-pip python3-venv > /dev/null 2>&1
     id alerta || (groupadd alerta && useradd -g alerta alerta) > /dev/null 2>&1
@@ -1358,11 +1378,11 @@ install_alerta() {
     /opt/alerta/bin/pip install alerta > /dev/null 2>&1
     mkdir /home/alerta/ > /dev/null 2>&1
     chown -R alerta:alerta /home/alerta > /dev/null 2>&1
-    /usr/bin/logger 'install_alerta() finished' -t 'Debian-FW-20220213'
+    /usr/bin/logger 'install_alerta() finished' -t 'Debian-FW-20220519'
 }
 
 configure_alerta_heartbeat() {
-    /usr/bin/logger 'configure_alerta_heartbeat()' -t 'Debian-FW-20220213'
+    /usr/bin/logger 'configure_alerta_heartbeat()' -t 'Debian-FW-20220519'
     echo "configure_alerta_heartbeat()";
     export DEBIAN_FRONTEND=noninteractive;
     id alerta || (groupadd alerta && useradd -g alerta alerta);
@@ -1412,7 +1432,7 @@ __EOF__
     systemctl start alerta-heartbeat.timer > /dev/null 2>&1
     systemctl start alerta-heartbeat.service > /dev/null 2>&1
     echo "configure_alerta_heartbeat() finished";
-    /usr/bin/logger 'configure_alerta_heartbeat() finished' -t 'Debian-FW-20220213'
+    /usr/bin/logger 'configure_alerta_heartbeat() finished' -t 'Debian-FW-20220519'
 }
 
 
@@ -1422,7 +1442,7 @@ __EOF__
 main() {
 
 echo -e "\e[32m-----------------------------------------------------\e[0m";
-echo -e "\e[32mStarting Installation of Debian-FW-20220213\e[0m";
+echo -e "\e[32mStarting Installation of Debian-FW-20220519\e[0m";
 echo -e "\e[32m-----------------------------------------------------\e[0m";
 echo -e;
 
@@ -1459,6 +1479,7 @@ configure_interfaces;
 configure_iptables;
 enable_ipforwarding;
 configure_dhcp_server;
+configure_dhclient_cleanup;
 configure_bind;
 configure_threatfox;
 configure_resolv;
@@ -1489,7 +1510,7 @@ configure_logrotate;
 #configure_alerta_heartbeat;
 
 ## Finish with encouraging message, then reboot
-echo -e "\e[32mInstallation and configuration of Debian-FW-20220213 complete.\e[0m";
+echo -e "\e[32mInstallation and configuration of Debian-FW-20220519 complete.\e[0m";
 echo -e "\e[1;31mAfter reboot, please verify everything works correctly and that nothing listens on the external interface\e[0m";
 echo -e;
 
