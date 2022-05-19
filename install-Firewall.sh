@@ -1236,11 +1236,11 @@ __EOF__
     /usr/bin/logger 'configure_motd() finished' -t 'Debian-FW-20220519';
 }
 
-install_ssh_keys() {
+install_ssh_public_keys() {
     /usr/bin/logger 'install_ssh_keys()' -t 'Debian-FW-20220519';
     echo -e "\e[32minstall_ssh_keys()\e[0m";
     echo -e "\e[36m-Add public key to authorized_keys file\e[0m";
-    # Echo add SSH public key for root logon - change this to your own key
+    # Echo add SSH public key for root logon - use your own key when asked
     mkdir /root/.ssh
     echo "ssh-ed25519 $SSH_PUBLIC_KEY" | tee -a /root/.ssh/authorized_keys
     chmod 700 /root/.ssh
@@ -1252,6 +1252,8 @@ install_ssh_keys() {
 configure_sshd() {
     /usr/bin/logger 'configure_sshd()' -t 'Debian-FW-20220519';
     echo -e "\e[32mconfigure_sshd()\e[0m";
+    # Disable password authN
+    echo "PasswordAuthentication no" | tee -a /etc/ssh/sshd_config > /dev/null 2>&1
     ## Generate new host keys
     echo -e "\e[36m-Delete and recreate host SSH keys\e[0m";
     rm -v /etc/ssh/ssh_host_*;
@@ -1489,7 +1491,7 @@ configure_hostapd;
 configure_cpu;
 
 # SSH setup
-install_SSH_PUBLIC_KEYs;
+install_ssh_public_keys;
 configure_sshd;
 configure_motd;
 
