@@ -70,7 +70,6 @@ options {
 	check-names master ignore;
 	auth-nxdomain no;    # conform to RFC1035
 	listen-on-v6 { none; };
-	#filter-aaaa-on-v4 yes;
 	listen-on { 127.0.0.1; 192.168.10.1; 192.168.20.1; 192.168.30.1; 192.168.40.1; };
 	allow-query { homenet; };
 	recursion yes;
